@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchStatus();
     setupAutoSave();
     setInterval(fetchStatus, 3000); // Poll every 3s
+    setInterval(fetchLogs, 1000);   // Poll logs every 1s
     document.getElementById('settingTemp').addEventListener('input', e => {
         document.getElementById('tempValue').textContent = e.target.value;
     });
@@ -107,6 +108,20 @@ async function fetchStatus() {
 
         // Settings (populate on first load)
         populateSettings(currentConfig);
+
+        // Chat Sync
+        const lastReply = state.last_reply;
+        const lastReplyTs = state.last_reply_ts || 0;
+
+        if (lastReply && lastReplyTs > (window.lastKnownReplyTs || 0)) {
+            window.lastKnownReplyTs = lastReplyTs;
+            // Avoid duplicates if already shown
+            const lastMsg = chatHistory[chatHistory.length - 1];
+            if (!lastMsg || lastMsg.content !== lastReply) {
+                addChatMessage('assistant', lastReply);
+                chatHistory.push({ role: 'assistant', content: lastReply });
+            }
+        }
 
         // Footer
         document.getElementById('lastUpdate').textContent = 'Updated: ' + new Date().toLocaleTimeString();
@@ -615,8 +630,106 @@ document.addEventListener('DOMContentLoaded', () => {
     if (chatTab) {
         chatTab.addEventListener('click', () => loadSessionList());
     }
-    // Collapse sidebar by default on mobile
     if (window.innerWidth < 768) {
         document.getElementById('chatSidebar')?.classList.add('collapsed');
+    }
+});
+
+// ── Terminal ──────────────────────────────────────────────────────────
+let terminalOpen = false;
+let lastLogCount = 0;
+
+function toggleTerminal() {
+    const el = document.getElementById('terminal');
+    terminalOpen = !terminalOpen;
+    el.classList.toggle('collapsed', !terminalOpen);
+    if (terminalOpen) {
+        fetchLogs();
+        setTimeout(scrollToBottom, 50);
+    }
+}
+
+function clearTerminal() {
+    document.getElementById('terminalContent').innerHTML = '';
+    lastLogCount = 0; // Reset count (warning: if server buffer not cleared, might duplicate on restart. But server buffer is persistent per session)
+}
+
+async function fetchLogs() {
+    if (!terminalOpen) return;
+    try {
+        const data = await api('/api/logs');
+        const logs = data.logs || [];
+
+        // If logs array is shorter than last count, it was reset
+        if (logs.length < lastLogCount) {
+            lastLogCount = 0;
+            document.getElementById('terminalContent').innerHTML = '';
+        }
+
+        if (logs.length > lastLogCount) {
+            const newLogs = logs.slice(lastLogCount);
+            const container = document.getElementById('terminalContent');
+            const frag = document.createDocumentFragment();
+
+            newLogs.forEach(line => {
+                const div = document.createElement('div');
+                div.className = 'log-line';
+
+                // Colorize logic
+                if (line.includes('ERROR') || line.includes('Exception') || line.includes('Error:')) div.classList.add('error');
+                else if (line.includes('WARNING')) div.classList.add('warn');
+                else if (line.includes('INFO')) div.classList.add('info');
+                else if (line.includes('[THINK]')) div.style.color = '#a78bfa'; // Purple
+                else if (line.includes('[TOOL]')) div.style.color = '#34d399';  // Green
+                else if (line.includes('PULSE ▶')) div.style.color = '#fb923c'; // Orange
+
+                div.textContent = line;
+                frag.appendChild(div);
+            });
+
+            container.appendChild(frag);
+            lastLogCount = logs.length;
+            scrollToBottom();
+        }
+    } catch (e) {
+        // console.warn('Log fetch error', e);
+    }
+}
+
+function scrollToBottom() {
+    const el = document.getElementById('terminalContent');
+    el.scrollTop = el.scrollHeight;
+}
+
+//  Terminal Resize -
+document.addEventListener('DOMContentLoaded', () => {
+    const tHandle = document.querySelector('.terminal-resize-handle');
+    const tPanel = document.getElementById('terminal');
+    let isResizing = false;
+
+    if (tHandle && tPanel) {
+        tHandle.addEventListener('mousedown', e => {
+            isResizing = true;
+            tHandle.classList.add('active');
+            document.body.style.cursor = 'ns-resize';
+            document.body.style.userSelect = 'none';
+        });
+
+        document.addEventListener('mousemove', e => {
+            if (!isResizing) return;
+            const newHeight = window.innerHeight - e.clientY;
+            if (newHeight > 100 && newHeight < window.innerHeight - 50) {
+                tPanel.style.height = newHeight + 'px';
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (isResizing) {
+                isResizing = false;
+                tHandle.classList.remove('active');
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+            }
+        });
     }
 });

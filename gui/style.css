@@ -1122,3 +1122,143 @@ footer {
         padding-right: 16px;
     }
 }
+
+/* ── Terminal Panel ────────────────────────────────────────────────── */
+.terminal-panel {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 320px;
+    background: #0c0c0c;
+    border-top: 1px solid var(--accent);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.5);
+}
+
+.terminal-panel.collapsed {
+    transform: translateY(100%);
+}
+
+.terminal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 16px;
+    background: #1a1a1a;
+    border-bottom: 1px solid #333;
+    user-select: none;
+    cursor: pointer;
+}
+
+.terminal-title {
+    font-family: 'Cascadia Code', 'Consolas', monospace;
+    font-size: 12px;
+    color: var(--accent);
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.terminal-content {
+    flex: 1;
+    padding: 12px;
+    overflow-y: auto;
+    font-family: 'Cascadia Code', 'Consolas', monospace;
+    font-size: 11.5px;
+    color: #d4d4d4;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+/* Scrollbar for terminal */
+.terminal-content::-webkit-scrollbar {
+    width: 10px;
+    background: #0c0c0c;
+}
+
+.terminal-content::-webkit-scrollbar-thumb {
+    background: #333;
+    border-radius: 4px;
+}
+
+.terminal-btn {
+    background: transparent;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    padding: 4px 8px;
+    font-family: monospace;
+    font-size: 12px;
+    transition: 0.2s;
+}
+
+.terminal-btn:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+}
+
+.btn-terminal-toggle {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-family: monospace;
+    margin-right: 8px;
+}
+
+.btn-terminal-toggle:hover {
+    background: rgba(124, 92, 252, 0.1);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.log-line {
+    margin-bottom: 2px;
+    border-left: 2px solid transparent;
+    padding-left: 6px;
+}
+
+.log-line:hover {
+    background: #111;
+}
+
+.log-line.system {
+    color: #666;
+    font-style: italic;
+}
+
+.log-line.error {
+    color: #f87171;
+    border-left-color: #f87171;
+}
+
+.log-line.warn {
+    color: #fb923c;
+}
+
+.log-line.info {
+    color: #8888a4;
+}
+
+.terminal-resize-handle {
+    height: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    cursor: ns-resize;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1002;
+    transition: background 0.2s;
+}
+
+.terminal-resize-handle:hover,
+.terminal-resize-handle.active {
+    background: var(--accent);
+}

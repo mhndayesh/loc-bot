@@ -21,6 +21,7 @@
             </div>
         </div>
         <div class="header-status">
+            <button class="btn btn-small btn-terminal-toggle" onclick="toggleTerminal()">_> Terminal</button>
             <span id="statusBadge" class="badge badge-ready">● Ready</span>
             <span id="providerBadge" class="badge badge-provider">Ollama</span>
         </div>
@@ -352,6 +353,24 @@
     </footer>
 
     <div id="toast" class="toast"></div>
+
+    <!-- ── Terminal Panel ────────────────────────────────────────────── -->
+    <div id="terminal" class="terminal-panel collapsed">
+        <div class="terminal-resize-handle"></div>
+        <div class="terminal-header" ondblclick="toggleTerminal()">
+            <div class="terminal-title">
+                <span class="terminal-icon">_></span> SYSTEM LOGS
+            </div>
+            <div class="terminal-controls">
+                <button class="terminal-btn" onclick="clearTerminal()" title="Clear">TRANS_CLR</button>
+                <button class="terminal-btn" onclick="toggleTerminal()" title="Toggle">_</button>
+            </div>
+        </div>
+        <div id="terminalContent" class="terminal-content">
+            <div class="log-line system">Initializing terminal connection...</div>
+        </div>
+        <!-- Resize handle could be added here if needed -->
+    </div>
 
     <script src="app.js?v=2"></script>
 </body>

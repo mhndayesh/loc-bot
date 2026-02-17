@@ -10,6 +10,7 @@ import http.client
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 import logging
+import collections
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 GUI_DIR = os.path.join(BASE_DIR, "gui")
@@ -25,6 +26,7 @@ log = logging.getLogger("server")
 # ── Heartbeat thread control ──────────────────────────────────────────
 heartbeat_thread = None
 heartbeat_running = False
+LOG_BUFFER = collections.deque(maxlen=2000)
 
 
 def load_json(path, default=None):
@@ -77,11 +79,20 @@ def run_heartbeat():
             env["AGENT_API_FORMAT"] = provider.get("api_format", "ollama")
             env["AGENT_MODEL"] = config.get("model", "llama3.2:3b")
 
-            subprocess.run(
+            # Stream output to LOG_BUFFER
+            with subprocess.Popen(
                 [sys.executable, engine_path, "--once"],
-                timeout=120, env=env,
-                capture_output=True,
-            )
+                env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, bufsize=1, encoding='utf-8', errors='replace'
+            ) as proc:
+                for line in proc.stdout:
+                    LOG_BUFFER.append(line.rstrip())
+            
+            # subprocess.run(
+            #     [sys.executable, engine_path, "--once"],
+            #     timeout=120, env=env,
+            #     capture_output=True,
+            # )
             # log.info("Pulse completed.") # Reduce log spam
         except Exception as e:
             log.error("Pulse error: %s", e)
@@ -258,6 +269,10 @@ class AgentAPIHandler(SimpleHTTPRequestHandler):
             with open(SCRATCHPAD_FILE, "w", encoding="utf-8") as f:
                 f.write("# SCRATCHPAD.md\n\n")
             self._json_response({"ok": True})
+            return
+
+        if path == "/api/logs":
+            self._json_response({"logs": list(LOG_BUFFER)})
             return
 
         # ── Session Management ──────────────────────────────────────────

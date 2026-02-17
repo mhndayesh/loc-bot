@@ -464,6 +464,10 @@ class AgentEngine:
                 "action": thinking[:80] if thinking else response[:80],
                 "result": str(result)[:100],
             })
+            # Save last reply for GUI Chat Sync
+            self.state["last_reply"] = str(result)
+            self.state["last_reply_ts"] = time.time()
+
             # keep progress list bounded
             if len(self.state["progress"]) > 20:
                 self.state["progress"] = self.state["progress"][-10:]
