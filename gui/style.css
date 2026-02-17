@@ -1262,3 +1262,152 @@ footer {
 .terminal-resize-handle.active {
     background: var(--accent);
 }
+
+/* ── Markdown & UX Polish ──────────────────────────────────────────── */
+.chat-bubble {
+    white-space: pre-wrap;
+    /* critical for line breaks */
+}
+
+/* Markdown Elements */
+.chat-bubble strong {
+    font-weight: 700;
+    color: #fff;
+}
+
+.chat-bubble em {
+    font-style: italic;
+    color: var(--text-dim);
+}
+
+.chat-bubble h1,
+.chat-bubble h2,
+.chat-bubble h3 {
+    margin: 16px 0 8px;
+    font-size: 1.1em;
+    color: var(--accent);
+    border-bottom: 1px solid #333;
+    padding-bottom: 4px;
+    font-weight: 600;
+}
+
+.chat-bubble ul,
+.chat-bubble ol {
+    margin: 8px 0 8px 20px;
+    padding: 0;
+}
+
+.chat-bubble li {
+    margin-bottom: 4px;
+}
+
+.chat-bubble p {
+    margin-bottom: 12px;
+}
+
+.chat-bubble p:last-child {
+    margin-bottom: 0;
+}
+
+/* Code Blocks */
+.md-code-block {
+    background: #111;
+    border: 1px solid #333;
+    border-radius: 6px;
+    margin: 12px 0;
+    overflow: hidden;
+}
+
+.md-code-header {
+    background: #1a1a1a;
+    padding: 4px 12px;
+    font-size: 10px;
+    color: #666;
+    border-bottom: 1px solid #333;
+    font-family: monospace;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.md-code-block code {
+    display: block;
+    padding: 12px;
+    overflow-x: auto;
+    font-family: 'Cascadia Code', 'Consolas', monospace;
+    font-size: 13px;
+    color: #e2e8f0;
+    white-space: pre;
+    line-height: 1.5;
+}
+
+/* Inline Code */
+.md-inline-code {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 2px 5px;
+    border-radius: 4px;
+    font-family: 'Cascadia Code', monospace;
+    font-size: 0.9em;
+    color: #e2e8f0;
+}
+
+/* Thoughts */
+.chat-thought {
+    margin-bottom: 12px;
+    border: 1px solid #333;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.2);
+    overflow: hidden;
+}
+
+.chat-thought summary {
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 600;
+    color: #666;
+    user-select: none;
+    background: rgba(255, 255, 255, 0.02);
+    transition: 0.2s;
+    list-style: none;
+    /* hide default triangle */
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.chat-thought summary::-webkit-details-marker {
+    display: none;
+}
+
+.chat-thought summary::before {
+    content: '▶';
+    font-size: 9px;
+    transition: transform 0.2s;
+}
+
+.chat-thought[open] summary::before {
+    transform: rotate(90deg);
+}
+
+.chat-thought summary:hover {
+    color: #ccc;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.chat-thought[open] summary {
+    border-bottom: 1px solid #333;
+    color: var(--accent);
+}
+
+.thought-content {
+    padding: 12px;
+    font-family: 'Cascadia Code', monospace;
+    font-size: 11.5px;
+    color: #888;
+    white-space: pre-wrap;
+    background: #0a0a0a;
+    max-height: 300px;
+    overflow-y: auto;
+    border-top: 1px solid #222;
+}

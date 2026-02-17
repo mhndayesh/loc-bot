@@ -118,8 +118,10 @@ async function fetchStatus() {
             // Avoid duplicates if already shown
             const lastMsg = chatHistory[chatHistory.length - 1];
             if (!lastMsg || lastMsg.content !== lastReply) {
-                addChatMessage('assistant', lastReply);
-                chatHistory.push({ role: 'assistant', content: lastReply });
+                // Parse think/content
+                const result = cleanResponse(lastReply);
+                addChatMessage('assistant', result);
+                chatHistory.push({ role: 'assistant', content: lastReply }); // Store raw
             }
         }
 
@@ -334,10 +336,53 @@ function escHtml(s) {
 }
 
 function cleanResponse(text) {
-    // Strip <think>...</think> and [THINK]...[/THINK] blocks
-    let cleaned = text.replace(/<think>[\s\S]*?<\/think>/gi, '');
-    cleaned = cleaned.replace(/\[THINK\][\s\S]*?\[\/THINK\]/gi, '');
-    return cleaned.trim();
+    // Return object { content, thought }
+    let thought = '';
+    let content = text || '';
+
+    // Extract [THINK]
+    const thinkMatch = content.match(/\[THINK\]([\s\S]*?)\[\/THINK\]/i);
+    if (thinkMatch) {
+        thought = thinkMatch[1].trim();
+        content = content.replace(thinkMatch[0], '');
+    }
+
+    // Extract <think>
+    const xmlMatch = content.match(/<think>([\s\S]*?)<\/think>/i);
+    if (xmlMatch) {
+        thought = xmlMatch[1].trim();
+        content = content.replace(xmlMatch[0], '');
+    }
+
+    return { content: content.trim(), thought: thought };
+}
+
+function parseMarkdown(text) {
+    if (!text) return '';
+
+    // 1. Escape HTML first
+    let out = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+    // 2. Code Blocks
+    out = out.replace(/```(\w*)([\s\S]*?)```/g, (match, lang, code) => {
+        return `<pre class="md-code-block"><div class="md-code-header">${lang || 'code'}</div><code>${code.trim()}</code></pre>`;
+    });
+
+    // 3. Inline Code
+    out = out.replace(/`([^`]+)`/g, '<code class="md-inline-code">$1</code>');
+
+    // 4. Bold
+    out = out.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+
+    // 5. Italic
+    out = out.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+
+    // 6. Headers
+    out = out.replace(/^### (.*$)/gim, '<h3>$1</h3>');
+    out = out.replace(/^## (.*$)/gim, '<h2>$1</h2>');
+    out = out.replace(/^# (.*$)/gim, '<h1>$1</h1>');
+
+    return out; // Newlines are handled by CSS white-space: pre-wrap
 }
 
 // Enter key on goal input
@@ -531,16 +576,50 @@ function addChatMessage(role, content, files = []) {
         }).join('');
     }
 
+    // Handle content object {content, thought} or string
+    let msgText = '';
+    let thoughtHtml = '';
+
+    if (typeof content === 'object' && content !== null && (content.content !== undefined || content.thought !== undefined)) {
+        msgText = content.content || '';
+        if (content.thought) {
+            thoughtHtml = `
+            <details class="chat-thought">
+                <summary>Thinking Process</summary>
+                <div class="thought-content">${escHtml(content.thought)}</div>
+            </details>`;
+        }
+    } else {
+        msgText = content || '';
+    }
+
+    // Role-based rendering
+    let bubbleContent = '';
+    if (role === 'assistant') {
+        bubbleContent = parseMarkdown(msgText);
+    } else {
+        bubbleContent = escHtml(msgText);
+    }
+
     const msgHtml = `
         <div class="chat-msg ${role}">
             <div class="chat-avatar">${avatar}</div>
-            <div>
-                <div class="chat-bubble">${escHtml(content)}${filesBadges}</div>
+            <div class="chat-content-wrapper">
+                ${thoughtHtml}
+                <div class="chat-bubble">
+                    ${bubbleContent}
+                    ${filesBadges}
+                </div>
                 <div class="chat-timestamp">${time}</div>
             </div>
         </div>`;
     container.insertAdjacentHTML('beforeend', msgHtml);
-    container.scrollTop = container.scrollHeight;
+
+    // Smart scroll
+    const isScrolledToBottom = container.scrollHeight - container.clientHeight <= container.scrollTop + 50;
+    if (isScrolledToBottom || role === 'user') { // Always scroll for user msg
+        container.scrollTop = container.scrollHeight;
+    }
 }
 
 function showTypingIndicator() {
@@ -593,9 +672,10 @@ async function sendChat() {
         if (data.error) {
             addChatMessage('assistant', '⚠ Error: ' + data.error);
         } else {
-            const reply = cleanResponse(data.reply || '(empty response)');
-            addChatMessage('assistant', reply || '(empty response)');
-            chatHistory.push({ role: 'assistant', content: reply });
+            const rawReply = data.reply || '(empty response)';
+            const result = cleanResponse(rawReply);
+            addChatMessage('assistant', result);
+            chatHistory.push({ role: 'assistant', content: rawReply }); // Store raw
         }
     } catch (e) {
         removeTypingIndicator();
