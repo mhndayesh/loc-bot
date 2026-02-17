@@ -1,0 +1,25 @@
+__pycache__/
+*.pyc
+*.log
+
+# Environment
+venv/
+node_modules/
+.env
+
+# Agent Memory & State
+memory/pulse_*.txt
+memory/chat_sessions/*.json
+state.json
+JOURNAL.md
+SCRATCHPAD.md
+environments.json
+SUMMARY.md
+
+# Workspace content (optional, keeping folder structure is good)
+workspace/*
+!workspace/.gitkeep
+
+# IDE
+.vscode/
+.idea/

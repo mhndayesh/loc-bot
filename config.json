@@ -1,0 +1,36 @@
+{
+  "provider": "lmstudio",
+  "providers": {
+    "ollama": {
+      "name": "Ollama",
+      "base_url": "http://localhost:11434",
+      "api_format": "ollama",
+      "api_key": "ollama",
+      "default_model": "llama3.2:3b"
+    },
+    "lmstudio": {
+      "name": "LM Studio",
+      "base_url": "http://localhost:1234",
+      "api_format": "openai",
+      "api_key": "lm-studio",
+      "default_model": "local-model"
+    }
+  },
+  "model": "deepseek/deepseek-r1-0528-qwen3-8b",
+  "temperature": 0.6,
+  "num_ctx": 32768,
+  "max_tokens": 8192,
+  "thinking_enabled": false,
+  "heartbeat_interval": 120,
+  "permissions": {
+    "run_command": true,
+    "write_file": true,
+    "read_file": true,
+    "list_dir": true,
+    "create_tool": true,
+    "append_file": true,
+    "sync_skills": true,
+    "compact_memory": true,
+    "update_state": true
+  }
+}

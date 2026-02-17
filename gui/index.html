@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>new-agent-mohannad</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <!-- ── Header ──────────────────────────────────────────────────── -->
+    <header>
+        <div class="logo">
+            <div class="logo-icon">🧠</div>
+            <div>
+                <h1>new-agent-mohannad</h1>
+                <span class="subtitle">Self-Evolving Agent System</span>
+            </div>
+        </div>
+        <div class="header-status">
+            <span id="statusBadge" class="badge badge-ready">● Ready</span>
+            <span id="providerBadge" class="badge badge-provider">Ollama</span>
+        </div>
+    </header>
+
+    <!-- ── Tab Navigation ──────────────────────────────────────────── -->
+    <nav class="tabs">
+        <button class="tab active" data-tab="dashboard">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="7" height="7" />
+                <rect x="14" y="3" width="7" height="7" />
+                <rect x="3" y="14" width="7" height="7" />
+                <rect x="14" y="14" width="7" height="7" />
+            </svg>
+            Dashboard
+        </button>
+        <button class="tab" data-tab="chat">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg>
+            Chat
+        </button>
+        <button class="tab" data-tab="activity">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+            </svg>
+            Activity
+        </button>
+        <button class="tab" data-tab="settings">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3" />
+                <path
+                    d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            </svg>
+            Settings
+        </button>
+    </nav>
+
+    <!-- ── Dashboard Tab ───────────────────────────────────────────── -->
+    <main id="tab-dashboard" class="tab-content active">
+        <!-- Controls Row -->
+        <div class="controls-row">
+            <div class="card controls-card">
+                <h3>Agent Control</h3>
+                <div class="control-buttons">
+                    <button id="btnPulse" class="btn btn-primary" onclick="triggerPulse()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <polygon points="5 3 19 12 5 21 5 3" />
+                        </svg>
+                        Single Pulse
+                    </button>
+                    <button id="btnHeartbeat" class="btn btn-accent" onclick="toggleHeartbeat()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path
+                                d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                        </svg>
+                        <span id="heartbeatLabel">Start Heartbeat</span>
+                    </button>
+                </div>
+            </div>
+            <div class="card goal-card">
+                <h3>Current Goal</h3>
+                <div class="goal-input-row">
+                    <input type="text" id="goalInput" placeholder="Set agent goal..." />
+                    <button class="btn btn-primary" onclick="setGoal()">Set</button>
+                </div>
+                <div class="goal-current">
+                    <span class="label">Active:</span>
+                    <span id="currentGoal" class="goal-text">(none)</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Row -->
+        <div class="stats-row">
+            <div class="stat-card">
+                <div class="stat-value" id="statPulses">0</div>
+                <div class="stat-label">Total Pulses</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="statStatus">ready</div>
+                <div class="stat-label">Status</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="statProvider">—</div>
+                <div class="stat-label">Provider</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="statModel">—</div>
+                <div class="stat-label">Model</div>
+            </div>
+        </div>
+
+        <!-- Progress -->
+        <div id="errorCard" class="card error-card" style="display:none">
+            <h3>⚠ Last Error</h3>
+            <div id="errorText" class="error-text"></div>
+        </div>
+
+        <div class="card">
+            <h3>Recent Progress</h3>
+            <div id="progressList" class="progress-list">
+                <div class="empty-state">No activity yet. Set a goal and trigger a pulse.</div>
+            </div>
+        </div>
+    </main>
+
+    <!-- ── Chat Tab ──────────────────────────────────────────────── -->
+    <main id="tab-chat" class="tab-content">
+        <div class="chat-layout">
+            <!-- Session Sidebar -->
+            <div id="chatSidebar" class="chat-sidebar">
+                <div class="sidebar-header">
+                    <h4>💾 Sessions</h4>
+                    <button class="btn btn-small" onclick="toggleSidebar()" title="Close sidebar">✕</button>
+                </div>
+                <div id="sessionList" class="session-list">
+                    <div class="empty-state">No saved sessions yet</div>
+                </div>
+            </div>
+
+            <!-- Main Chat Area -->
+            <div class="chat-container">
+                <div class="chat-header">
+                    <div class="chat-header-left">
+                        <button class="btn btn-small" onclick="toggleSidebar()" title="Show sessions">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <line x1="3" y1="6" x2="21" y2="6" />
+                                <line x1="3" y1="12" x2="21" y2="12" />
+                                <line x1="3" y1="18" x2="21" y2="18" />
+                            </svg>
+                        </button>
+                        <h3>💬 Chat with Model</h3>
+                    </div>
+                    <div class="chat-header-controls">
+                        <label class="thinking-toggle" title="Toggle step-by-step reasoning">
+                            <span class="thinking-label">🧠 Thinking</span>
+                            <label class="toggle">
+                                <input type="checkbox" id="thinkingToggle" checked onchange="toggleThinking()" />
+                                <span class="slider"></span>
+                            </label>
+                        </label>
+                        <button class="btn btn-small btn-new-chat" onclick="newChat()" title="New Chat">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <line x1="12" y1="5" x2="12" y2="19" />
+                                <line x1="5" y1="12" x2="19" y2="12" />
+                            </svg>
+                            New
+                        </button>
+                    </div>
+                </div>
+                <div id="chatMessages" class="chat-messages">
+                    <div class="chat-welcome">
+                        <div class="chat-welcome-icon">🤖</div>
+                        <div class="chat-welcome-text">Start a conversation with your model. You can also attach files.
+                        </div>
+                    </div>
+                </div>
+                <div id="chatAttachments" class="chat-attachments"></div>
+                <div class="chat-input-row">
+                    <button class="btn chat-attach-btn" onclick="document.getElementById('fileInput').click()"
+                        title="Attach files">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path
+                                d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                        </svg>
+                    </button>
+                    <input type="file" id="fileInput" multiple style="display:none" onchange="handleFileAttach(event)"
+                        accept="*/*" />
+                    <textarea id="chatInput" class="chat-textarea" placeholder="Type a message..." rows="1"
+                        onkeydown="chatKeyDown(event)"></textarea>
+                    <button id="chatSendBtn" class="btn btn-primary chat-send-btn" onclick="sendChat()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <line x1="22" y1="2" x2="11" y2="13" />
+                            <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- ── Activity Tab ────────────────────────────────────────────── -->
+    <main id="tab-activity" class="tab-content">
+        <div class="two-col">
+            <div class="card">
+                <div class="card-header-row">
+                    <h3>🧠 Recent Thoughts</h3>
+                    <button class="btn btn-small" onclick="clearScratchpad()">Clear</button>
+                </div>
+                <pre id="scratchpadView" class="log-view">(empty)</pre>
+            </div>
+            <div class="card">
+                <div class="card-header-row">
+                    <h3>📋 Journal</h3>
+                    <button class="btn btn-small" onclick="clearJournal()">Clear</button>
+                </div>
+                <pre id="journalView" class="log-view">(empty)</pre>
+            </div>
+        </div>
+    </main>
+
+    <!-- ── Settings Tab ────────────────────────────────────────────── -->
+    <main id="tab-settings" class="tab-content">
+        <!-- Provider Selection -->
+        <div class="card">
+            <h3>LLM Provider</h3>
+            <p class="card-desc">Switch between Ollama and LM Studio with one click.</p>
+            <div class="provider-toggle">
+                <button id="btnOllama" class="provider-btn active" onclick="switchProvider('ollama')">
+                    <div class="provider-icon">🦙</div>
+                    <div class="provider-name">Ollama</div>
+                    <div class="provider-url">localhost:11434</div>
+                </button>
+                <button id="btnLmstudio" class="provider-btn" onclick="switchProvider('lmstudio')">
+                    <div class="provider-icon">🔬</div>
+                    <div class="provider-name">LM Studio</div>
+                    <div class="provider-url">localhost:1234</div>
+                </button>
+            </div>
+        </div>
+
+        <!-- Model Settings -->
+        <div class="card">
+            <h3>Model Configuration</h3>
+            <div class="settings-grid">
+                <div class="setting-item">
+                    <label for="settingModel">Model</label>
+                    <div class="model-select-row">
+                        <select id="settingModel">
+                            <option value="">— click Fetch Models —</option>
+                        </select>
+                        <button class="btn btn-small" onclick="fetchModels()">Fetch Models</button>
+                    </div>
+                </div>
+                <div class="setting-item">
+                    <label for="settingTemp">Temperature</label>
+                    <div class="range-row">
+                        <input type="range" id="settingTemp" min="0" max="1" step="0.05" value="0.1" />
+                        <span id="tempValue">0.1</span>
+                    </div>
+                </div>
+                <div class="setting-item">
+                    <label for="settingCtx">Context Window</label>
+                    <select id="settingCtx">
+                        <option value="2048">2k (Fast)</option>
+                        <option value="4096" selected>4k (Standard)</option>
+                        <option value="8192">8k (High)</option>
+                        <option value="16384">16k</option>
+                        <option value="32768">32k</option>
+                        <option value="65536">64k</option>
+                        <option value="131072">128k</option>
+                        <option value="262144">256k</option>
+                        <option value="524288">512k</option>
+                        <option value="1048576">1m (Extreme)</option>
+                    </select>
+                </div>
+                <div class="setting-item">
+                    <label for="settingInterval">Heartbeat Interval (s)</label>
+                    <input type="number" id="settingInterval" min="10" max="600" value="60" />
+                </div>
+                <div class="setting-item">
+                    <label for="settingMaxTokens">Max Tokens (Response Limit)</label>
+                    <select id="settingMaxTokens">
+                        <option value="0" selected>Unlimited</option>
+                        <option value="256">256</option>
+                        <option value="512">512</option>
+                        <option value="1024">1024 (1k)</option>
+                        <option value="2048">2048 (2k)</option>
+                        <option value="4096">4096 (4k)</option>
+                        <option value="8192">8192 (8k)</option>
+                        <option value="16384">16384 (16k)</option>
+                        <option value="32768">32768 (32k)</option>
+                        <option value="65536">65536 (64k)</option>
+                        <option value="131072">131072 (128k)</option>
+                        <option value="262144">262144 (256k)</option>
+                        <option value="524288">524288 (512k)</option>
+                        <option value="1048576">1048576 (1m)</option>
+                    </select>
+                </div>
+            </div>
+            <button class="btn btn-primary" style="margin-top:16px" onclick="saveSettings()">Save Settings</button>
+        </div>
+
+        <!-- Provider URLs -->
+        <div class="card">
+            <h3>Provider URLs</h3>
+            <p class="card-desc">Customize API endpoints for each provider.</p>
+            <div class="settings-grid">
+                <div class="setting-item">
+                    <label for="ollamaUrl">Ollama Base URL</label>
+                    <input type="text" id="ollamaUrl" placeholder="http://localhost:11434" />
+                </div>
+                <div class="setting-item">
+                    <label for="lmstudioUrl">LM Studio Base URL</label>
+                    <input type="text" id="lmstudioUrl" placeholder="http://localhost:1234" />
+                </div>
+                <div class="setting-item">
+                    <label for="ollamaKey">Ollama API Key</label>
+                    <input type="text" id="ollamaKey" placeholder="ollama" />
+                </div>
+                <div class="setting-item">
+                    <label for="lmstudioKey">LM Studio API Key</label>
+                    <input type="text" id="lmstudioKey" placeholder="lm-studio" />
+                </div>
+            </div>
+            <button class="btn btn-primary" style="margin-top:16px" onclick="saveProviderUrls()">Save URLs</button>
+        </div>
+
+        <!-- Permissions -->
+        <div class="card">
+            <h3>Tool Permissions</h3>
+            <p class="card-desc">Control which tools the agent is allowed to use.</p>
+            <div id="permissionsGrid" class="permissions-grid"></div>
+            <button class="btn btn-primary" style="margin-top:16px" onclick="savePermissions()">Save
+                Permissions</button>
+        </div>
+    </main>
+
+    <footer>
+        <span>new-agent-mohannad v1.0</span>
+        <span id="lastUpdate">Last update: —</span>
+    </footer>
+
+    <div id="toast" class="toast"></div>
+
+    <script src="app.js?v=2"></script>
+</body>
+
+</html>
