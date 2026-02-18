@@ -7,7 +7,7 @@
     <title>new-agent-mohannad</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=16">
 </head>
 
 <body>
@@ -82,6 +82,10 @@
                         </svg>
                         <span id="heartbeatLabel">Start Heartbeat</span>
                     </button>
+                    <button id="btnDreamDashboard" class="btn btn-danger btn-dream-prominent"
+                        onclick="triggerDreaming()" title="Manually trigger memory consolidation (Summarize + Embed)">
+                        ✨ Dream Now
+                    </button>
                 </div>
             </div>
             <div class="card goal-card">
@@ -131,14 +135,17 @@
         </div>
     </main>
 
-    <!-- ── Chat Tab ──────────────────────────────────────────────── -->
-    <main id="tab-chat" class="tab-content">
+    <!-- Chat Tab -->
+    <div id="tab-chat" class="tab-content">
         <div class="chat-layout">
             <!-- Session Sidebar -->
             <div id="chatSidebar" class="chat-sidebar">
                 <div class="sidebar-header">
                     <h4>💾 Sessions</h4>
-                    <button class="btn btn-small" onclick="toggleSidebar()" title="Close sidebar">✕</button>
+                    <div style="display: flex; gap: 4px;">
+                        <button class="btn btn-small btn-new-chat" onclick="newChat()" title="Start New Chat">+</button>
+                        <button class="btn btn-small" onclick="toggleSidebar()" title="Close sidebar">✕</button>
+                    </div>
                 </div>
                 <div id="sessionList" class="session-list">
                     <div class="empty-state">No saved sessions yet</div>
@@ -147,44 +154,42 @@
 
             <!-- Main Chat Area -->
             <div class="chat-container">
-                <div class="chat-header">
-                    <div class="chat-header-left">
-                        <button class="btn btn-small" onclick="toggleSidebar()" title="Show sessions">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <line x1="3" y1="6" x2="21" y2="6" />
-                                <line x1="3" y1="12" x2="21" y2="12" />
-                                <line x1="3" y1="18" x2="21" y2="18" />
-                            </svg>
-                        </button>
-                        <h3>💬 Chat with Model</h3>
+                <header class="chat-header">
+                    <button class="sidebar-toggle" onclick="toggleSidebar()">☰</button>
+                    <div class="chat-header-info">
+                        <span id="chatTitle">Chat with Model</span>
+                        <div class="chat-header-meta">
+                            <span id="modelBadge" class="badge">Loading...</span>
+                            <div class="thinking-control">
+                                <span>🧠 Thinking</span>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="thinkingToggle" onchange="toggleThinking()">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                        </div>
                     </div>
-                    <div class="chat-header-controls">
-                        <label class="thinking-toggle" title="Toggle step-by-step reasoning">
-                            <span class="thinking-label">🧠 Thinking</span>
-                            <label class="toggle">
-                                <input type="checkbox" id="thinkingToggle" checked onchange="toggleThinking()" />
-                                <span class="slider"></span>
-                            </label>
-                        </label>
-                        <button class="btn btn-small btn-new-chat" onclick="newChat()" title="New Chat">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <line x1="12" y1="5" x2="12" y2="19" />
-                                <line x1="5" y1="12" x2="19" y2="12" />
-                            </svg>
-                            New
-                        </button>
-                    </div>
-                </div>
+                    <button id="btnDreamChat" class="btn btn-danger btn-small btn-dream-prominent"
+                        onclick="triggerDreaming()" title="Manually trigger memory consolidation (Summarize + Embed)"
+                        style="margin-right: 8px;">
+                        ✨ Dream Now
+                    </button>
+                    <button id="btnStop" class="btn btn-danger btn-small" onclick="stopAgent()"
+                        title="Stop all autonomous actions">
+                        STOP
+                    </button>
+                </header>
+
                 <div id="chatMessages" class="chat-messages">
                     <div class="chat-welcome">
                         <div class="chat-welcome-icon">🤖</div>
-                        <div class="chat-welcome-text">Start a conversation with your model. You can also attach files.
-                        </div>
+                        <div class="chat-welcome-text">Start a conversation with your model.</div>
                     </div>
+                    <div id="chatAnchor"></div>
                 </div>
+
                 <div id="chatAttachments" class="chat-attachments"></div>
+
                 <div class="chat-input-row">
                     <button class="btn chat-attach-btn" onclick="document.getElementById('fileInput').click()"
                         title="Attach files">
@@ -208,7 +213,7 @@
                 </div>
             </div>
         </div>
-    </main>
+    </div>
 
     <!-- ── Activity Tab ────────────────────────────────────────────── -->
     <main id="tab-activity" class="tab-content">
@@ -312,6 +317,45 @@
             <button class="btn btn-primary" style="margin-top:16px" onclick="saveSettings()">Save Settings</button>
         </div>
 
+        <!-- Embedding Configuration -->
+        <div class="card">
+            <h3>Embedding Memory Configuration</h3>
+            <p class="card-desc">Select the model used for vectorizing and searching your long-term memories.</p>
+
+            <div class="setting-item" style="margin-bottom: 24px;">
+                <label>Embedding Provider</label>
+                <div class="provider-toggle small-toggle">
+                    <button id="btnEmbLocal" class="provider-btn active" onclick="switchEmbeddingProvider('local')">
+                        <div class="provider-icon">💻</div>
+                        <div class="provider-name">Local</div>
+                    </button>
+                    <button id="btnEmbOllama" class="provider-btn" onclick="switchEmbeddingProvider('ollama')">
+                        <div class="provider-icon">🦙</div>
+                        <div class="provider-name">Ollama</div>
+                    </button>
+                    <button id="btnEmbLmstudio" class="provider-btn" onclick="switchEmbeddingProvider('lmstudio')">
+                        <div class="provider-icon">🔬</div>
+                        <div class="provider-name">LM Studio</div>
+                    </button>
+                </div>
+            </div>
+
+            <div class="settings-grid">
+                <div class="setting-item">
+                    <label for="settingEmbModel">Embedding Model</label>
+                    <div class="model-select-row">
+                        <select id="settingEmbModel">
+                            <option value="">— click Fetch Models —</option>
+                        </select>
+                        <button class="btn btn-small" onclick="fetchEmbeddingModels()">Fetch Models</button>
+                    </div>
+                </div>
+            </div>
+            <div class="settings-actions" style="margin-top:24px; display:flex; gap:12px;">
+                <button class="btn btn-primary" onclick="saveSettings()">Save Configuration</button>
+            </div>
+        </div>
+
         <!-- Provider URLs -->
         <div class="card">
             <h3>Provider URLs</h3>
@@ -372,7 +416,7 @@
         <!-- Resize handle could be added here if needed -->
     </div>
 
-    <script src="app.js?v=2"></script>
+    <script src="app.js?v=16"></script>
 </body>
 
 </html>

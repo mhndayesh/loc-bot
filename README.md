@@ -11,7 +11,7 @@
 
 2.  **Installation**:
     ```bash
-    git clone https://github.com/yourusername/loc-bot.git
+    git clone https://github.com/mhndayesh/loc-bot.git
     cd loc-bot
     pip install -r requirements.txt  # (if applicable, or just standard lib)
     ```
@@ -25,12 +25,13 @@
 
 ## ✨ Key Features
 
-*   **Autonomy**: Runs in a continuous loop (Pulse) to achieve goals.
+*   **Episodic Memory**: A local vector database that allows the agent to learn from past experiences and recall successful solutions JIT (Just-In-Time).
+*   **Dreaming (Self-Optimization)**: Periodically summarizes recent logs and extracts high-level "Wisdom" to improve future performance.
+*   **Workspace Organization**: Strict enforcement of an `output/` directory for all agent-generated content to maintain a clean root.
 *   **Tool Use**: Can read/write files, run shell commands, and manage system processes.
 *   **Environment Management**: Creates and manages isolated Python/Node.js environments for safe execution.
-*   **Self-Correction**: detects errors, steps back, thinks, and retries.
+*   **Dynamic Settings**: Real-time adjustment of LLM parameters (Context, Tokens, Heartbeat) via the GUI.
 *   **Identity Protection**: "Constitutional" safeguards prevent the agent from accidentally deleting its own instructions.
-*   **Persistence**: Auto-saves state, settings, and chat history.
 
 ## 📚 Documentation
 

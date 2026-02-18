@@ -1,4 +1,5 @@
 
+"""system_stats: Monitor CPU, Memory, and Disk usage."""
 import psutil
 import platform
 import json

@@ -5,13 +5,29 @@ let heartbeatRunning = false;
 // ── Init ──────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
     initTabs();
+    initSettings();
+    initScrollObserver();
     fetchStatus();
-    setupAutoSave();
-    setInterval(fetchStatus, 3000); // Poll every 3s
-    setInterval(fetchLogs, 1000);   // Poll logs every 1s
-    document.getElementById('settingTemp').addEventListener('input', e => {
-        document.getElementById('tempValue').textContent = e.target.value;
+    fetchModels();
+    fetchSessions().then(() => {
+        const lastSid = localStorage.getItem('lastSessionId');
+        if (lastSid) {
+            console.log('Restoring last session:', lastSid);
+            loadSession(lastSid);
+        }
     });
+
+    // Resize textarea automatically
+    const chatInput = document.getElementById('chatInput');
+    if (chatInput) {
+        chatInput.addEventListener('input', function () {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+        });
+    }
+    // Start periodic polling
+    setInterval(fetchStatus, 3000);
+    setInterval(fetchLogs, 2000);
 });
 
 // ── Tabs ──────────────────────────────────────────────────────────────
@@ -65,8 +81,21 @@ async function fetchStatus() {
         document.getElementById('statProvider').textContent = providerName;
         document.getElementById('statModel').textContent = currentConfig.model || '—';
 
+        // Chat header badge
+        const modelBadge = document.getElementById('modelBadge');
+        if (modelBadge) {
+            modelBadge.textContent = currentConfig.model || '—';
+        }
+
         // Goal
-        document.getElementById('currentGoal').textContent = state.goal || '(none)';
+        const goalEl = document.getElementById('currentGoal');
+        goalEl.textContent = state.goal || '(none)';
+        const goalContainer = goalEl.closest('.goal-current');
+        if (state.goal && state.goal.toLowerCase() !== 'done') {
+            goalContainer.classList.add('busy');
+        } else {
+            goalContainer.classList.remove('busy');
+        }
 
         // Progress list
         const progressList = document.getElementById('progressList');
@@ -115,20 +144,41 @@ async function fetchStatus() {
 
         if (lastReply && lastReplyTs > (window.lastKnownReplyTs || 0)) {
             window.lastKnownReplyTs = lastReplyTs;
-            // Avoid duplicates if already shown
-            const lastMsg = chatHistory[chatHistory.length - 1];
-            if (!lastMsg || lastMsg.content !== lastReply) {
-                // Parse think/content
-                const result = cleanResponse(lastReply);
-                addChatMessage('assistant', result);
-                chatHistory.push({ role: 'assistant', content: lastReply }); // Store raw
+
+            // Filter out [SILENT_OK] from chat sync
+            if (lastReply.includes('[SILENT_OK]')) {
+                console.log('Filtered silent reply');
+            } else {
+                // Avoid duplicates if already shown
+                const lastMsg = chatHistory[chatHistory.length - 1];
+                if (!lastMsg || lastMsg.content !== lastReply) {
+                    // Parse think/content
+                    const result = cleanResponse(lastReply);
+                    // Only add if there is actual content or thought
+                    if (result.content || result.thought) {
+                        addChatMessage('assistant', result);
+                        chatHistory.push({ role: 'assistant', content: lastReply }); // Store raw
+                    } else {
+                        console.log('Skipping empty/silent reply');
+                        // We still update history to prevent re-processing? 
+                        // If we don't push to history, next poll will try again.
+                        // So we MUST push to history to mark it as "seen".
+                        // BUT we don't call addChatMessage.
+                        chatHistory.push({ role: 'assistant', content: lastReply });
+                    }
+                }
             }
         }
 
         // Footer
         document.getElementById('lastUpdate').textContent = 'Updated: ' + new Date().toLocaleTimeString();
     } catch (e) {
-        console.warn('Status fetch failed:', e);
+        // console.warn('Status fetch failed:', e);
+        const statusBadge = document.getElementById('statusBadge');
+        if (statusBadge) {
+            statusBadge.textContent = '● Offline';
+            statusBadge.className = 'badge badge-error';
+        }
     }
 }
 
@@ -140,15 +190,18 @@ function populateSettings(config) {
     settingsPopulated = true;
 
     // Model select — set current value or add it as option
-    const modelSelect = document.getElementById('settingModel');
-    const currentModel = config.model || '';
-    if (currentModel && !modelSelect.querySelector(`option[value="${currentModel}"]`)) {
-        const opt = document.createElement('option');
-        opt.value = currentModel;
-        opt.textContent = currentModel;
-        modelSelect.insertBefore(opt, modelSelect.firstChild);
-    }
     modelSelect.value = currentModel;
+
+    // Embedding Model select
+    const embModelSelect = document.getElementById('settingEmbModel');
+    const currentEmbModel = config.embedding_model || '';
+    if (currentEmbModel && !embModelSelect.querySelector(`option[value="${currentEmbModel}"]`)) {
+        const opt = document.createElement('option');
+        opt.value = currentEmbModel;
+        opt.textContent = currentEmbModel;
+        embModelSelect.insertBefore(opt, embModelSelect.firstChild);
+    }
+    embModelSelect.value = currentEmbModel;
 
     document.getElementById('settingTemp').value = config.temperature || 0.1;
     document.getElementById('tempValue').textContent = config.temperature || 0.1;
@@ -164,6 +217,12 @@ function populateSettings(config) {
     const active = config.provider || 'ollama';
     document.getElementById('btnOllama').classList.toggle('active', active === 'ollama');
     document.getElementById('btnLmstudio').classList.toggle('active', active === 'lmstudio');
+
+    // Embedding Provider buttons
+    const activeEmb = config.embedding_provider || 'local';
+    document.getElementById('btnEmbLocal')?.classList.toggle('active', activeEmb === 'local');
+    document.getElementById('btnEmbOllama')?.classList.toggle('active', activeEmb === 'ollama');
+    document.getElementById('btnEmbLmstudio')?.classList.toggle('active', activeEmb === 'lmstudio');
 
     // Provider URLs
     const providers = config.providers || {};
@@ -215,6 +274,20 @@ async function toggleHeartbeat() {
     fetchStatus();
 }
 
+async function stopAgent() {
+    const btn = document.getElementById('btnStop');
+    btn.disabled = true;
+    toast('🛑 Sending stop request...');
+    try {
+        await api('/api/stop', 'POST');
+        toast('✓ Stopping agent loop');
+        fetchStatus();
+    } catch (e) {
+        toast('✗ Stop request failed');
+    }
+    btn.disabled = false;
+}
+
 async function setGoal() {
     const input = document.getElementById('goalInput');
     const goal = input.value.trim();
@@ -231,13 +304,24 @@ async function switchProvider(provider) {
     document.getElementById('btnOllama').classList.toggle('active', provider === 'ollama');
     document.getElementById('btnLmstudio').classList.toggle('active', provider === 'lmstudio');
     settingsPopulated = false;
-    toast('✓ Switched to ' + (provider === 'ollama' ? 'Ollama' : 'LM Studio'));
+    toast('✓ Switched LLM Provider to ' + (provider === 'ollama' ? 'Ollama' : 'LM Studio'));
+    fetchStatus();
+}
+
+async function switchEmbeddingProvider(provider) {
+    await api('/api/embedding_provider', 'POST', { provider });
+    document.getElementById('btnEmbLocal')?.classList.toggle('active', provider === 'local');
+    document.getElementById('btnEmbOllama')?.classList.toggle('active', provider === 'ollama');
+    document.getElementById('btnEmbLmstudio')?.classList.toggle('active', provider === 'lmstudio');
+    settingsPopulated = false;
+    toast('✓ Switched Embedding Provider to ' + provider);
     fetchStatus();
 }
 
 async function saveSettings() {
     const update = {
         model: document.getElementById('settingModel').value,
+        embedding_model: document.getElementById('settingEmbModel').value,
         temperature: parseFloat(document.getElementById('settingTemp').value),
         num_ctx: parseInt(document.getElementById('settingCtx').value),
         heartbeat_interval: parseInt(document.getElementById('settingInterval').value),
@@ -274,6 +358,51 @@ async function fetchModels() {
         }
     } catch (e) {
         toast('✗ Failed to fetch models');
+    }
+}
+
+async function fetchEmbeddingModels() {
+    toast('⏳ Fetching embedding models...');
+    try {
+        const data = await api('/api/embedding_models');
+        const select = document.getElementById('settingEmbModel');
+        const current = select.value;
+        select.innerHTML = '';
+        if (data.models && data.models.length > 0) {
+            data.models.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m;
+                opt.textContent = m;
+                select.appendChild(opt);
+            });
+            if (current && data.models.includes(current)) {
+                select.value = current;
+            }
+            toast('✓ Found ' + data.models.length + ' embedding models');
+        } else {
+            select.innerHTML = '<option value="">No models found</option>';
+            toast('✗ No models found for embedding provider');
+        }
+    } catch (e) {
+        toast('✗ Failed to fetch embedding models');
+    }
+}
+
+async function triggerDreaming() {
+    toast('✨ Stage 1: Summarizing recent activity...');
+    try {
+        const res = await api('/api/pulse', 'POST', { type: 'reflect' });
+        if (res.ok) {
+            toast('🧠 Stage 2: Re-generating episodic embeddings...');
+            setTimeout(() => {
+                toast('✓ Dreaming complete — memories consolidated.');
+                fetchStatus();
+            }, 1500);
+        } else {
+            toast('✗ Dreaming failed: ' + (res.error || 'Unknown error'));
+        }
+    } catch (e) {
+        toast('✗ Dreaming request failed');
     }
 }
 
@@ -318,14 +447,27 @@ async function savePermissions() {
     toast('✓ Permissions saved');
 }
 
-function setupAutoSave() {
-    const inputs = ['settingModel', 'settingCtx', 'settingInterval', 'settingMaxTokens'];
+function initSettings() {
+    const inputs = ['settingModel', 'settingEmbModel', 'settingCtx', 'settingInterval', 'settingMaxTokens'];
     inputs.forEach(id => {
         const el = document.getElementById(id);
         if (el) el.addEventListener('change', saveSettings);
     });
     const tempEl = document.getElementById('settingTemp');
-    if (tempEl) tempEl.addEventListener('change', saveSettings);
+    if (tempEl) {
+        tempEl.addEventListener('change', saveSettings);
+        tempEl.addEventListener('input', e => {
+            document.getElementById('tempValue').textContent = e.target.value;
+        });
+    }
+    document.getElementById('thinkingToggle')?.addEventListener('change', toggleThinking);
+    document.getElementById('btnOllama')?.addEventListener('click', () => switchProvider('ollama'));
+    document.getElementById('btnLmstudio')?.addEventListener('click', () => switchProvider('lmstudio'));
+    document.getElementById('btnFetchModels')?.addEventListener('click', fetchModels);
+    document.getElementById('btnSaveProviderUrls')?.addEventListener('click', saveProviderUrls);
+    document.getElementById('permissionsGrid')?.addEventListener('change', e => {
+        if (e.target.matches('[data-perm]')) savePermissions();
+    });
 }
 
 // ── Utility ───────────────────────────────────────────────────────────
@@ -340,28 +482,69 @@ function cleanResponse(text) {
     let thought = '';
     let content = text || '';
 
-    // Extract [THINK]
-    const thinkMatch = content.match(/\[THINK\]([\s\S]*?)\[\/THINK\]/i);
-    if (thinkMatch) {
-        thought = thinkMatch[1].trim();
-        content = content.replace(thinkMatch[0], '');
+    // Extract ALL [THINK] blocks and concatenate them
+    const thinkRegex = /\[THINK\]([\s\S]*?)\[\/THINK\]/gi;
+    let match;
+    while ((match = thinkRegex.exec(content)) !== null) {
+        thought += match[1].trim() + '\n';
+    }
+    // Remove ALL [THINK] blocks from content
+    content = content.replace(thinkRegex, '');
+
+    // Extract <think> (Ollama / DeepSeek style)
+    const xmlRegex = /<think>([\s\S]*?)<\/think>/gi;
+    while ((match = xmlRegex.exec(content)) !== null) {
+        thought += match[1].trim() + '\n';
+    }
+    content = content.replace(xmlRegex, '');
+
+    // Check if a tool was used (to provide a placeholder if content is empty)
+    const hasTool = /\[TOOL\]/gi.test(content);
+
+    // Strip [TOOL] blocks from the final chat display
+    const toolRegex = /\[TOOL\]([\s\S]*?)\[\/TOOL\]/gi;
+    content = content.replace(toolRegex, '');
+
+    // Strip [SILENT_OK]
+    content = content.replace(/\[SILENT_OK\]/gi, '');
+
+    content = content.trim();
+
+    // FAIL-SAFE: If content is empty but something happened (thought or tool),
+    // provide a representative placeholder so the bubble isn't empty.
+    if (!content) {
+        if (hasTool) {
+            content = "*Performing action...*";
+        } else if (thought) {
+            content = "*Thinking...*";
+        }
     }
 
-    // Extract <think>
-    const xmlMatch = content.match(/<think>([\s\S]*?)<\/think>/i);
-    if (xmlMatch) {
-        thought = xmlMatch[1].trim();
-        content = content.replace(xmlMatch[0], '');
-    }
-
-    return { content: content.trim(), thought: thought };
+    return { content, thought: thought.trim() };
 }
 
 function parseMarkdown(text) {
     if (!text) return '';
 
+    // 0. Clean Protocol Tags
+    // Strip [TOOL] blocks entirely from user view
+    let out = text.replace(/\[TOOL\][\s\S]*?\[\/TOOL\]/gi, '');
+
+    // Strip [SILENT_OK]
+    out = out.replace(/\[SILENT_OK\]/gi, '');
+
+    // Strip [THINK] blocks if they leaked (should be handled by separate parser, but safety first)
+    out = out.replace(/\[THINK\][\s\S]*?\[\/THINK\]/gi, '');
+
+    // Trim extra whitespace caused by removals
+    out = out.trim();
+
+    // If message is empty after stripping (e.g. only tool use), return empty string
+    // The UI should handle empty messages gracefully (e.g. show nothing or a subtle indicator)
+    if (!out) return '';
+
     // 1. Escape HTML first
-    let out = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    out = out.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
     // 2. Code Blocks
     out = out.replace(/```(\w*)([\s\S]*?)```/g, (match, lang, code) => {
@@ -406,7 +589,7 @@ function toggleSidebar() {
     document.getElementById('chatSidebar').classList.toggle('collapsed');
 }
 
-async function loadSessionList() {
+async function fetchSessions() {
     try {
         const data = await api('/api/chat/sessions', 'POST', {});
         const container = document.getElementById('sessionList');
@@ -438,7 +621,7 @@ async function saveSession() {
         messages: chatHistory,
     });
     currentSessionId = sid;
-    loadSessionList();
+    fetchSessions();
     return sid;
 }
 
@@ -452,13 +635,23 @@ async function newChat() {
     chatHistory = [];
     pendingFiles = [];
     currentSessionId = null;
+    localStorage.removeItem('lastSessionId');
+
+    // Reset backend goal
+    try {
+        await api('/api/goal', 'POST', { goal: '' });
+        console.log('Backend goal cleared');
+    } catch (err) {
+        console.error('Failed to clear backend goal:', err);
+    }
+
     renderAttachments();
     document.getElementById('chatMessages').innerHTML = `
         <div class="chat-welcome">
             <div class="chat-welcome-icon">🤖</div>
             <div class="chat-welcome-text">Start a conversation with your model. You can also attach files.</div>
         </div>`;
-    loadSessionList();
+    fetchSessions();
     toast('📝 New chat started');
 }
 
@@ -474,6 +667,7 @@ async function loadSession(sid) {
             return;
         }
         currentSessionId = data.id;
+        localStorage.setItem('lastSessionId', currentSessionId);
         chatHistory = data.messages || [];
         pendingFiles = [];
         renderAttachments();
@@ -491,7 +685,7 @@ async function loadSession(sid) {
                     <div class="chat-welcome-text">Start a conversation with your model.</div>
                 </div>`;
         }
-        loadSessionList();
+        fetchSessions();
         toast('📂 Loaded: ' + (data.title || 'Session'));
     } catch (e) {
         toast('✗ Failed to load session');
@@ -499,17 +693,14 @@ async function loadSession(sid) {
 }
 
 async function deleteSession(sid) {
+    if (!confirm('Are you sure you want to delete this session?')) return;
     await api('/api/chat/delete', 'POST', { id: sid });
     if (currentSessionId === sid) {
         currentSessionId = null;
-        chatHistory = [];
-        document.getElementById('chatMessages').innerHTML = `
-            <div class="chat-welcome">
-                <div class="chat-welcome-icon">🤖</div>
-                <div class="chat-welcome-text">Start a conversation with your model.</div>
-            </div>`;
+        localStorage.removeItem('lastSessionId');
+        newChat();
     }
-    loadSessionList();
+    fetchSessions();
     toast('🗑 Session deleted');
 }
 
@@ -519,6 +710,11 @@ function handleFileAttach(event) {
     if (!files.length) return;
 
     Array.from(files).forEach(file => {
+        // Warning for large files (> 5MB)
+        if (file.size > 5 * 1024 * 1024) {
+            toast(`⚠️ Large file(${(file.size / 1024 / 1024).toFixed(1)}MB). Browser may slow down.`);
+        }
+
         const reader = new FileReader();
         const isText = file.type.startsWith('text/') ||
             /\.(md|json|js|py|html|css|csv|xml|yaml|yml|toml|ini|cfg|log|txt|sh|bat|ps1|sql|ts|jsx|tsx|c|cpp|h|hpp|java|rb|go|rs|php|pl|lua|r|swift|kt)$/i.test(file.name);
@@ -557,6 +753,45 @@ function removeAttachment(index) {
     renderAttachments();
 }
 
+// ── Scroll Management ────────────────────────────────────────────────
+let isUserAtBottom = true;
+
+function initScrollObserver() {
+    const container = document.getElementById('chatMessages');
+    if (!container) return;
+
+    // Detect manual scrolling
+    container.addEventListener('scroll', () => {
+        const threshold = 150;
+        isUserAtBottom = container.scrollHeight - container.clientHeight <= container.scrollTop + threshold;
+    });
+
+    // Use MutationObserver to watch for content changes
+    // ChildList: for new messages, Subtree: for markdown rendering inside messages
+    const observer = new MutationObserver(() => {
+        if (isUserAtBottom) {
+            // Double-tick strategy to wait for next paint cycle
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    container.scrollTop = container.scrollHeight;
+                });
+            });
+        }
+    });
+
+    observer.observe(container, { childList: true, subtree: true, characterData: true });
+}
+
+function scrollToBottom(force = false) {
+    const container = document.getElementById('chatMessages');
+    if (!container) return;
+
+    if (force) {
+        isUserAtBottom = true;
+        container.scrollTop = container.scrollHeight;
+    }
+}
+
 // ── Message Display ───────────────────────────────────────────────────
 function addChatMessage(role, content, files = []) {
     const container = document.getElementById('chatMessages');
@@ -572,7 +807,7 @@ function addChatMessage(role, content, files = []) {
             const icon = f.type?.startsWith('image/') ? '🖼️' :
                 f.type?.startsWith('video/') ? '🎬' :
                     f.type?.startsWith('audio/') ? '🎵' : '📄';
-            return `<div class="chat-file-badge">${icon} ${escHtml(f.name)}</div>`;
+            return `< div class="chat-file-badge" > ${icon} ${escHtml(f.name)}</div > `;
         }).join('');
     }
 
@@ -606,19 +841,20 @@ function addChatMessage(role, content, files = []) {
             <div class="chat-avatar">${avatar}</div>
             <div class="chat-content-wrapper">
                 ${thoughtHtml}
-                <div class="chat-bubble">
+                <div class="chat-bubble" style="word-break: break-word;">
                     ${bubbleContent}
                     ${filesBadges}
                 </div>
                 <div class="chat-timestamp">${time}</div>
             </div>
         </div>`;
-    container.insertAdjacentHTML('beforeend', msgHtml);
 
-    // Smart scroll
-    const isScrolledToBottom = container.scrollHeight - container.clientHeight <= container.scrollTop + 50;
-    if (isScrolledToBottom || role === 'user') { // Always scroll for user msg
-        container.scrollTop = container.scrollHeight;
+    // Simplified insertion - ResizeObserver handles the scroll
+    const msgDiv = document.createElement('div');
+    msgDiv.innerHTML = msgHtml;
+    container.appendChild(msgDiv.firstElementChild);
+    if (role === 'user') {
+        scrollToBottom(true);
     }
 }
 
@@ -630,8 +866,16 @@ function showTypingIndicator() {
             <div class="dot"></div><div class="dot"></div><div class="dot"></div>
         </div>
     </div>`;
+
+    // Check if we should auto-scroll for the indicator
+    const threshold = 150;
+    const wasAtBottom = container.scrollHeight - container.clientHeight <= container.scrollTop + threshold;
+
     container.insertAdjacentHTML('beforeend', html);
-    container.scrollTop = container.scrollHeight;
+    if (wasAtBottom) {
+        isUserAtBottom = true;
+        scrollToBottom(true);
+    }
 }
 
 function removeTypingIndicator() {
@@ -747,8 +991,14 @@ async function fetchLogs() {
         }
 
         if (logs.length > lastLogCount) {
-            const newLogs = logs.slice(lastLogCount);
             const container = document.getElementById('terminalContent');
+
+            // Clear the "Initializing terminal connection..." message on first success
+            if (lastLogCount === 0) {
+                container.innerHTML = '';
+            }
+
+            const newLogs = logs.slice(lastLogCount);
             const frag = document.createDocumentFragment();
 
             newLogs.forEach(line => {
@@ -759,9 +1009,11 @@ async function fetchLogs() {
                 if (line.includes('ERROR') || line.includes('Exception') || line.includes('Error:')) div.classList.add('error');
                 else if (line.includes('WARNING')) div.classList.add('warn');
                 else if (line.includes('INFO')) div.classList.add('info');
+                else if (line.includes('DEBUG')) div.classList.add('debug');
                 else if (line.includes('[THINK]')) div.style.color = '#a78bfa'; // Purple
                 else if (line.includes('[TOOL]')) div.style.color = '#34d399';  // Green
                 else if (line.includes('PULSE ▶')) div.style.color = '#fb923c'; // Orange
+                else if (line.includes('SILENT REPLY')) div.style.color = '#94a3b8'; // Slate (dim)
 
                 div.textContent = line;
                 frag.appendChild(div);
@@ -770,9 +1022,12 @@ async function fetchLogs() {
             container.appendChild(frag);
             lastLogCount = logs.length;
             scrollToBottom();
+        } else if (logs.length === 0 && lastLogCount === 0) {
+            // No logs yet
+            document.getElementById('terminalContent').innerHTML = '<div class="log-line system">Waiting for system output...</div>';
         }
     } catch (e) {
-        // console.warn('Log fetch error', e);
+        document.getElementById('terminalContent').innerHTML = `<div class="log-line error">Connection Error: ${e.message}</div>`;
     }
 }
 

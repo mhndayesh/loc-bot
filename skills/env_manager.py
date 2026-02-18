@@ -1,4 +1,5 @@
 
+"""env_manager: Manage Python virtual environments."""
 import os
 import sys
 import json

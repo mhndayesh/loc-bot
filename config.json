@@ -2,26 +2,26 @@
   "provider": "lmstudio",
   "providers": {
     "ollama": {
-      "name": "Ollama",
       "base_url": "http://localhost:11434",
       "api_format": "ollama",
       "api_key": "ollama",
       "default_model": "llama3.2:3b"
     },
     "lmstudio": {
-      "name": "LM Studio",
-      "base_url": "http://localhost:1234",
+      "base_url": "http://localhost:1234/v1",
       "api_format": "openai",
       "api_key": "lm-studio",
-      "default_model": "local-model"
+      "default_model": "bullmoose-0.1-llama-3-8b-alpha"
     }
   },
   "model": "deepseek/deepseek-r1-0528-qwen3-8b",
-  "temperature": 0.6,
-  "num_ctx": 32768,
-  "max_tokens": 8192,
+  "temperature": 0.1,
+  "num_ctx": 4096,
+  "max_tokens": 0,
   "thinking_enabled": true,
-  "heartbeat_interval": 120,
+  "embedding_provider": "lmstudio",
+  "embedding_model": "text-embedding-nomic-embed-text-v1.5",
+  "heartbeat_interval": 60,
   "permissions": {
     "run_command": true,
     "write_file": true,
@@ -32,5 +32,6 @@
     "sync_skills": true,
     "compact_memory": true,
     "update_state": true
-  }
+  },
+  "test_key": "test_value"
 }

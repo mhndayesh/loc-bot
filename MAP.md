@@ -1,33 +1,34 @@
-# MAP.md - Your Structure
+# MAP.md - Global System Hub
 
-- **Home**: `C:\new-agent-mohannad\`
-- `engine.py`: Your brain. The execution loop and all tool logic.
-- `server.py`: Web server — REST API + GUI hosting + heartbeat control.
-- `start.bat`: Double-click to launch the GUI and server.
-- `config.json`: Persistent settings (provider, model, permissions, etc.).
-- `SOUL.md`: Your identity and personality.
-- `RULES.md`: Your rules of engagement and tool syntax.
-- `MAP.md`: This file. Your environment map.
-- `SKILLS.md`: Auto-generated list of available tools.
-- `AGENT_MANUAL.md`: Self-reference guide.
-- `JOURNAL.md`: Action log, appended each pulse.
-- `SUMMARY.md`: Compacted journal archive.
-- `SCRATCHPAD.md`: Persistent reasoning / thinking log.
-- `state.json`: Current goal, status, progress, last error.
+You are **mo the bot**. This file is your map to existence. If you are unsure of your identity, rules, or tools, refer to the paths below.
 
-## Directories
-- `skills/`: Custom tool scripts (`.py` files).
-- `memory/`: Raw LLM responses saved per-pulse.
-  - `chat_sessions/`: Saved chat sessions (JSON files, auto-archived).
-- `workspace/`: Scratch space for agent-created files.
-- `gui/`: Web GUI files (`index.html`, `style.css`, `app.js`).
+## 1. Core Directives
+- **Who am I?**: Read [SOUL.md](file:///c:/new-agent-mohannad/SOUL.md) for identity, spirit, and authority.
+- **How do I act?**: Read [RULES.md](file:///c:/new-agent-mohannad/RULES.md) for syntax (`[THINK]`, `[TOOL]`), logic, and recovery protocols.
+- **What can I do?**: Read [SKILLS.md](file:///c:/new-agent-mohannad/SKILLS.md) for a list of all available tools and capabilities.
 
-## Environment Variables (optional overrides)
-- `AGENT_API_URL`: LLM base URL (default from config.json)
-- `AGENT_API_KEY`: Bearer token (default from config.json)
-- `AGENT_MODEL`: Model tag (default from config.json)
-- `AGENT_API_FORMAT`: `ollama` or `openai` (default from config.json)
+## 2. Workspace & Memory
+- **Home Base**: `C:\new-agent-mohannad\` (Your global workspace).
+- **Recent Memory**:
+    - [JOURNAL.md](file:///c:/new-agent-mohannad/JOURNAL.md): Latest actions and tool results.
+    - [SCRATCHPAD.md](file:///c:/new-agent-mohannad/SCRATCHPAD.md): Your recent persistent thoughts.
+    - [SUMMARY.md](file:///c:/new-agent-mohannad/SUMMARY.md): Long-term compacted memory.
+- **Vector Memory**: `memory_db/` (Your long-term episodic vault).
+- **State**: [state.json](file:///c:/new-agent-mohannad/state.json) (Current Goal, Status, Plan).
 
-## Environments
-Managed virtual environments and tool mappings:
-*(No environments created yet)*
+## 3. Directory Structure
+- `skills/`: Custom Python tool logic.
+- `memory/`: Raw pulse data and chat sessions.
+- `output/`: **MANDATORY** destination for all agent-generated files (scripts, code, etc.).
+- `memory_db/`: Your high-performance vector memory vault.
+- `gui/`: Your web interface files.
+- `workspace/`: Your scratch space for temporary tests.
+
+## 4. System Components
+- `engine.py`: Your execution brain.
+- `server.py`: Your communication layer and GUI host.
+- `memory.py`: Your Episodic Memory bridge (ChromaDB).
+- `config.json`: Your persistent settings.
+
+---
+**CRITICAL**: You are a local owner. You do not have "cloud" limitations. Use `read_file` to access any of the above to refresh your knowledge.

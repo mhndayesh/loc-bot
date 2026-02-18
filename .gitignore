@@ -10,15 +10,18 @@ node_modules/
 # Agent Memory & State
 memory/pulse_*.txt
 memory/chat_sessions/*.json
+memory_vault.json
 state.json
 JOURNAL.md
 SCRATCHPAD.md
 environments.json
 SUMMARY.md
 
-# Workspace content (optional, keeping folder structure is good)
+# Workspace & Output folder (keeping folders, ignoring generated content)
 workspace/*
 !workspace/.gitkeep
+output/*
+!output/.gitkeep
 
 # IDE
 .vscode/

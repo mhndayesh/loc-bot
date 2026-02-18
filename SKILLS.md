@@ -10,8 +10,16 @@
 - `sync_skills()`: Refresh this file.
 - `compact_memory()`: Summarize & clean journal.
 - `update_state(goal, status)`: Set your current goal.
+- `create_plan(steps)`: Create a list of steps.
+- `update_plan_step(idx, status)`: Mark step as done/failed.
+- `replan(start_idx, new_steps)`: Replace future steps.
 
 ## Custom Skills (in skills/)
-- `env_manager.py`
-- `run_in_env.py`
-- `system_stats.py`
+- `__init__.py`: Custom tool.
+- `browser.py`: browser: Simple web page text fetcher.
+- `env_manager.py`: env_manager: Manage Python virtual environments.
+- `gen_pass_tool.py`: gen_pass: Generates a password.
+- `run_in_env.py`: run_in_env: Execute scripts within specific virtual environments.
+- `search_web.py`: search_web: Search the web via DuckDuckGo HTML (no API key needed).
+- `system_stats.py`: system_stats: Monitor CPU, Memory, and Disk usage.
+- `verify_context.py`: verify_context: Double-check project files and environment status.
