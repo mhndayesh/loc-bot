@@ -177,6 +177,15 @@ class AgentEngine:
         with open(JOURNAL_FILE, "a", encoding="utf-8") as f:
             ts = time.strftime("%Y-%m-%d %H:%M:%S")
             f.write(f"### {ts}\n- **Action**: {action}\n- **Result**: {result}\n\n")
+        
+        # PROACTIVE COMPACTION: If journal > 20KB, move to summary and trigger Dreaming
+        try:
+            if os.path.exists(JOURNAL_FILE) and os.path.getsize(JOURNAL_FILE) > 20000:
+                log.info("Journal size exceeded 20KB. Triggering compaction and Dreaming.")
+                self._compact_memory()
+                self.reflect(force=True) # Ensure consolidation happens immediately
+        except Exception as e:
+            log.warning("Journal auto-compaction/dreaming failed: %s", e)
 
     # ── Step-back system ───────────────────────────────────────────────
     def step_back(self, error_msg: str):
@@ -562,23 +571,15 @@ class AgentEngine:
         # 3. Vision
         parts.append("## Vision\nYou have native vision. If an image is provided, you see it.")
 
-        # 4. Mandatory Syntax (Ultra-Lean)
+        # 4. Mandatory Rules & Tools (Ultra-Lean)
         parts.append(
-            "## Rules of Engagement\n"
-            "1. ALWAYS reason inside `[THINK]...[/THINK]` (Required).\n"
-            "2. ALL actions MUST use `[TOOL] read_file(\"MAP.md\") [/TOOL]` (Mandatory). Do NOT use `[TXT]` or other tags.\n"
-            "3. Be brief. Max 1-2 sentences for final answers.\n"
-            "4. For help on identity/rules/skills, refer to **MAP.md**.\n\n"
-            "## Available Tools\n"
-            "- `read_file(path)`: Read a file.\n"
-            "- `write_file(path, content)`: Write/create a file.\n"
-            "- `run_command(cmd)`: Run a shell command.\n"
-            "- `list_dir(path)`: List directory contents.\n"
-            "- `update_state(goal, status)`: Set your current goal and status.\n"
-            "- `memorize(text, solution, rating)`: Store a lesson in vector memory.\n"
-            "- `recall(query, n=3)`: Retrieve relevant memories.\n"
-            "- `search_web(query)`: Search the web.\n"
-            "- `system_stats()`: Get CPU/Memory/Disk status.\n"
+            "## Rules\n"
+            "1. Reason in `[THINK]...[/THINK]`.\n"
+            "2. Actions MUST use `[TOOL] read_file(\"MAP.md\") [/TOOL]` syntax.\n"
+            "3. Be brief. 1-2 sentence max reply.\n"
+            "4. Refer to MAP.md for identity/skills.\n\n"
+            "## Tools\n"
+            "- `read_file`, `write_file`, `run_command`, `list_dir`, `update_state`, `recall`, `recall`, `search_web`, `system_stats`"
         )
 
         # 5. Current State
@@ -747,6 +748,22 @@ class AgentEngine:
                      prompt += "\n\nSYSTEM HINT: Command failed. Use `verify_context()` to check your OS and permissions.\n"
                 elif "Error" in r:
                      prompt += "\n\nSYSTEM HINT: The last command returned an error. Read the error message carefully. Do not blindly retry the exact same command.\n"
+
+        # 0. Early Exit for Heartbeat (Zero-Cost Idle)
+        if mode == "heartbeat":
+            goal = self.state.get("goal", "").lower().strip()
+            if not goal or goal == "done":
+                pending_reflect = False
+                if os.path.exists(JOURNAL_FILE) and os.path.getsize(JOURNAL_FILE) > 100: # Small buffer
+                    pending_reflect = True
+                if os.path.exists(MEMORY_DIR):
+                    if any(f.startswith("pulse_") for f in os.listdir(MEMORY_DIR)):
+                        pending_reflect = True
+                
+                if not pending_reflect:
+                    log.info("Zero-Cost Idle: No active goal or pending memories. [SILENT_OK]")
+                    print("[SILENT_OK]") # Ensure server catches this
+                    return
 
         # 1. Ask the LLM
         response = self.call_llm(prompt)

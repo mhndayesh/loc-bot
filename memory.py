@@ -63,28 +63,37 @@ class MemoryMaker:
         api_key = p_cfg.get("api_key", "")
         model = self.model_name
 
-        try:
-            if api_format == "ollama":
-                resp = requests.post(f"{url}/api/embeddings", json={
-                    "model": model,
-                    "prompt": text
-                }, timeout=10)
-                return resp.json().get("embedding")
-            else: # OpenAI format
-                headers = {"Authorization": f"Bearer {api_key}"}
-                # ROBUST PATH: If base_url already has /v1, don't add it again
-                endpoint = f"{url}/embeddings" if url.endswith("/v1") else f"{url}/v1/embeddings"
-                
-                resp = requests.post(endpoint, headers=headers, json={
-                    "model": model,
-                    "input": text
-                }, timeout=10)
-                
-                data = resp.json().get("data", [])
-                if data:
-                    return data[0].get("embedding")
-        except Exception as e:
-            logger.error(f"Remote encoding ({self.provider}) failed: {e}")
+        for attempt in range(3):
+            try:
+                if api_format == "ollama":
+                    resp = requests.post(f"{url}/api/embeddings", json={
+                        "model": model,
+                        "prompt": text
+                    }, timeout=15)
+                    return resp.json().get("embedding")
+                else: # OpenAI format
+                    headers = {"Authorization": f"Bearer {api_key}"}
+                    # ROBUST PATH: If base_url already has /v1, don't add it again
+                    endpoint = f"{url}/embeddings" if url.endswith("/v1") else f"{url}/v1/embeddings"
+                    
+                    resp = requests.post(endpoint, headers=headers, json={
+                        "model": model,
+                        "input": text
+                    }, timeout=15)
+                    
+                    data = resp.json().get("data", [])
+                    if data:
+                        return data[0].get("embedding")
+                    
+                    error = resp.json().get("error", "")
+                    if "No models loaded" in str(error) or "Loading" in str(error):
+                        logger.warning(f"Embedding Model not ready (Attempt {attempt+1}/3). Waiting 5s...")
+                        time.sleep(5)
+                        continue
+            except Exception as e:
+                logger.error(f"Remote encoding attempt {attempt+1} failed: {e}")
+                if attempt < 2: time.sleep(2)
+        
         return None
 
 # Initialize Global Components

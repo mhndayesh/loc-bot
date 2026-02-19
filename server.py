@@ -168,9 +168,8 @@ def run_heartbeat():
         
         if status in ("working", "recovering"):
             interval = 0.5  # Fast loop for active work
-        elif state.get("goal") and state.get("goal").lower().strip() != "done":
-            interval = 1.0  # Autonomous goal pursuit mode
         else:
+            # Unified interval for both idle heartbeat and autonomous goals (60s default)
             interval = base_interval
 
         try:
@@ -198,16 +197,37 @@ def run_heartbeat():
             # --- Active Goal Pursuit Trigger ---
             goal = state.get("goal", "").lower().strip()
             is_active = (goal != "" and goal != "done")
-            mode = "chat" if is_active else "heartbeat"
             
-            with subprocess.Popen(
-                [sys.executable, engine_path, "--once", "--mode", mode],
-                env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                text=True, bufsize=1, encoding='utf-8', errors='replace'
-            ) as proc:
-                if proc.stdout:
-                    for line in proc.stdout:
-                        LOG_BUFFER.append(line.rstrip())
+            # Check for silent pending work (memories)
+            has_memories = False
+            if os.path.exists(JOURNAL_FILE) and os.path.getsize(JOURNAL_FILE) > 100:
+                has_memories = True
+            elif os.path.exists(MEMORY_DIR) and any(f.startswith("pulse_") for f in os.listdir(MEMORY_DIR)):
+                has_memories = True
+
+            should_pulse = is_active or status in ("working", "recovering") or has_memories
+            
+            if not should_pulse:
+                # Zero-Cost Idle: Don't spawn engine if nothing to do
+                pass 
+            else:
+                mode = "chat" if is_active else "heartbeat"
+                with subprocess.Popen(
+                    [sys.executable, engine_path, "--once", "--mode", mode],
+                    env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                    text=True, bufsize=1, encoding='utf-8', errors='replace'
+                ) as proc:
+                    is_silent = False
+                    if proc.stdout:
+                        for line in proc.stdout:
+                            LOG_BUFFER.append(line.rstrip())
+                            if "SILENT REPLY" in line:
+                                is_silent = True
+                    
+                    # If silent, force wait the full base_interval even if goal is active
+                    if is_silent:
+                        log.info("Engine was silent. Applying backoff sleep: %ds", base_interval)
+                        interval = base_interval
             
         except Exception as e:
             log.error("Pulse error: %s", e)
@@ -348,10 +368,15 @@ class AgentAPIHandler(SimpleHTTPRequestHandler):
             self._json_response({"logs": list(LOG_BUFFER)})
             return
 
-        # ── Static file fallback ───────────────────────────────────────
         if path == "/" or path == "":
             self.path = "/index.html"
         super().do_GET()
+
+    def end_headers(self):
+        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+        self.send_header("Pragma", "no-cache")
+        self.send_header("Expires", "0")
+        super().end_headers()
 
     def do_POST(self):
         global heartbeat_thread, heartbeat_running
@@ -416,12 +441,20 @@ class AgentAPIHandler(SimpleHTTPRequestHandler):
                 heartbeat_thread = threading.Thread(target=run_heartbeat, daemon=True)
                 heartbeat_thread.start()
                 log.info("Heartbeat started via GUI.")
+                # PERSISTENCE: Save state to config
+                config = load_config()
+                config["heartbeat_running"] = True
+                save_json(CONFIG_FILE, config)
             self._json_response({"running": True})
             return
 
         if path == "/api/heartbeat/stop":
             heartbeat_running = False
             log.info("Heartbeat stopped via GUI.")
+            # PERSISTENCE: Save state to config
+            config = load_config()
+            config["heartbeat_running"] = False
+            save_json(CONFIG_FILE, config)
             self._json_response({"running": False})
             return
 
@@ -537,6 +570,15 @@ class AgentAPIHandler(SimpleHTTPRequestHandler):
                 self._json_response({"error": "Session not found"}, 404)
             return
 
+        if path == "/api/chat/delete_all":
+            sessions_dir = os.path.join(MEMORY_DIR, "chat_sessions")
+            if os.path.exists(sessions_dir):
+                import shutil
+                shutil.rmtree(sessions_dir)
+                os.makedirs(sessions_dir, exist_ok=True)
+            self._json_response({"ok": True})
+            return
+
         # ── Chat ───────────────────────────────────────────────────────
         if path == "/api/chat":
             user_msg = body.get("message", "")
@@ -596,9 +638,8 @@ class AgentAPIHandler(SimpleHTTPRequestHandler):
                 sys_prompt += f"\n\n## Past Experience (Wisdom)\nYou have solved a similar problem before. Use this to avoid repeating mistakes:\n---\n{past_wisdom}\n---\n"
             # ---------------------------------------------
 
-            # Summarize old context if history is long
-            # Use new trim_history logic for robust context management
-            msgs_to_send = trim_history(history, max_chars=20000) # Leave room for system prompt & new msg
+            # Trim history to a lean buffer (8k chars ~2k tokens)
+            msgs_to_send = trim_history(history) 
             
             messages = [{"role": "system", "content": sys_prompt}]
             for h in msgs_to_send:
@@ -724,10 +765,10 @@ class AgentAPIHandler(SimpleHTTPRequestHandler):
 
 
 # ── Agent-aware system prompt builder ─────────────────────────────────
-def trim_history(history, max_chars=24000):
+def trim_history(history, max_chars=8000, max_turns=6):
     """
-    Trim message history to fit within a character-based context budget.
-    Prioritizes keeping recent messages and strips base64 from older turns.
+    Trim history to a lean rolling window. 
+    Memory recall (Dreaming) handles the long-term context.
     """
     if not history:
         return []
@@ -738,6 +779,10 @@ def trim_history(history, max_chars=24000):
     # Process history backwards (most recent first)
     # We keep images only for the very last turn in history if it exists
     for i, m in enumerate(reversed(history)):
+        # Enforce max_turns (10 messages = 5 turns)
+        if len(trimmed) >= max_turns:
+            break
+
         msg_copy = dict(m)
         content = str(msg_copy.get("content", ""))
         
@@ -835,24 +880,15 @@ def _build_chat_system_prompt(thinking_enabled):
     # 2. Workspace
     parts.append(f"## Environment\nOS: Windows\nWorkspace: {BASE_DIR}\nMap: [MAP.md](file:///c:/new-agent-mohannad/MAP.md)")
 
-    # 3. Mandatory Syntax & Format
+    # Rules & Tools (Streamlined)
     parts.append(
-        "## Rules of Engagement\n"
-        "1. ALWAYS reason inside `[THINK]...[/THINK]` (Required).\n"
-        "2. ALL actions MUST use `[TOOL] read_file(\"MAP.md\") [/TOOL]` syntax. Use real tool names.\\n"
-        "3. **OUTPUT FOLDER**: ALWAYS save generated files (scripts, code, reports) to the `output/` directory (e.g., `write_file(\"output/game.py\", ...)`). Do NOT use the root directory.\\n"
-        "4. Be brief. Max 1-2 sentences for final answers.\\n"
-        "4. For help on identity/rules/skills, refer to **MAP.md**.\n\n"
-        "## Available Tools\n"
-        "- `read_file(path)`: Read a file.\n"
-        "- `write_file(path, content)`: Write/create a file.\n"
-        "- `run_command(cmd)`: Run a shell command.\n"
-        "- `list_dir(path)`: List directory contents.\n"
-        "- `update_state(goal, status)`: Set your current goal and status.\n"
-        "- `memorize(text, solution, rating)`: Store a lesson in vector memory.\n"
-        "- `recall(query, n=3)`: Retrieve relevant memories.\n"
-        "- `search_web(query)`: Search the web.\n"
-        "- `system_stats()`: Get CPU/Memory/Disk status.\n"
+        "## Rules\n"
+        "1. Reason in `[THINK]...[/THINK]`.\n"
+        "2. Save files to `output/` via `write_file`.\n"
+        "3. Focus ONLY on current goal + MAP.md.\n"
+        "4. Be brief. 1-2 sentence max reply.\n\n"
+        "## Tools\n"
+        "- `read_file`, `write_file`, `run_command`, `list_dir`, `update_state`, `recall`, `search_web`, `system_stats`"
     )
 
     return "\n\n".join(parts)
@@ -876,6 +912,14 @@ if __name__ == "__main__":
         log.info("Heartbeat started via config (interval=%ds)", cfg.get("heartbeat_interval"))
 
     os.makedirs(GUI_DIR, exist_ok=True)
+    # Load initial config and restore heartbeat if enabled
+    config = load_config()
+    if config.get("heartbeat_running", False):
+        heartbeat_running = True
+        heartbeat_thread = threading.Thread(target=run_heartbeat, daemon=True)
+        heartbeat_thread.start()
+        log.info("Heartbeat resumed from persistent state.")
+
     server = HTTPServer(("127.0.0.1", args.port), AgentAPIHandler)
     log.info("GUI server running at http://localhost:%d", args.port)
     try:

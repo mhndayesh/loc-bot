@@ -346,8 +346,8 @@ header {
 }
 
 .btn-danger {
-    background: rgba(248, 113, 113, 0.1);
-    border-color: var(--red);
+    background: rgba(248, 113, 113, 0.15);
+    border-color: rgba(248, 113, 113, 0.4);
     color: var(--red);
 }
 
@@ -769,12 +769,43 @@ footer {
     overflow: hidden;
 }
 
+.sidebar-footer {
+    padding: 16px;
+    border-top: 1px solid var(--border);
+    margin-top: auto;
+    /* Push to bottom */
+    background: var(--bg-card);
+}
+
 .chat-sidebar.collapsed {
     width: 0;
-    min-width: 0;
+    min-width: 0 !important;
     margin-right: 0;
-    border: none;
     opacity: 0;
+    pointer-events: none;
+    border: none;
+}
+
+.sidebar-toggle {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-size: 18px;
+    cursor: pointer;
+    width: 38px;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    transition: all var(--transition);
+    margin-right: 12px;
+}
+
+.sidebar-toggle:hover {
+    background: rgba(124, 92, 252, 0.1);
+    border-color: var(--accent);
+    color: var(--accent);
 }
 
 .sidebar-header {
@@ -797,54 +828,73 @@ footer {
     padding: 8px;
 }
 
-.session-card {
-    padding: 10px 12px;
-    border-radius: 8px;
+.session-delete {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    opacity: 0.8 !important;
+    /* Extremely visible */
     cursor: pointer;
-    transition: background 0.15s ease;
-    margin-bottom: 4px;
-    position: relative;
-}
-
-.session-card:hover {
-    background: rgba(124, 92, 252, 0.08);
-}
-
-.session-card.active {
-    background: rgba(124, 92, 252, 0.15);
-    border-left: 3px solid var(--accent);
-}
-
-.session-title {
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--text);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    margin-bottom: 4px;
-}
-
-.session-meta {
+    font-size: 14px;
+    color: #ef4444;
+    /* Vivid Red */
+    background: rgba(239, 68, 68, 0.1);
+    padding: 6px;
+    border-radius: 6px;
+    transition: all var(--transition);
     display: flex;
-    justify-content: space-between;
-    font-size: 10px;
-    color: var(--text-dim);
+    align-items: center;
+    justify-content: center;
+}
+
+.session-card:hover .session-delete {
+    opacity: 1 !important;
+    background: #ef4444;
+    color: white;
+}
+
+.sidebar-toggle {
+    background: #7c5cfc;
+    /* Brand Accent */
+    border: none;
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    /* Circular for visibility */
+    transition: all var(--transition);
+    margin-right: 16px;
+    box-shadow: 0 4px 12px var(--accent-glow);
+}
+
+.sidebar-toggle:hover {
+    background: #6b4de6;
+    transform: scale(1.1);
 }
 
 .session-delete {
     position: absolute;
-    top: 8px;
-    right: 8px;
-    opacity: 0;
+    top: 10px;
+    right: 10px;
+    opacity: 0.25;
+    /* Always slightly visible */
     cursor: pointer;
     font-size: 14px;
     color: var(--text-dim);
-    transition: opacity 0.15s, color 0.15s;
+    transition: all var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .session-card:hover .session-delete {
-    opacity: 0.6;
+    opacity: 0.8;
+    color: var(--red);
 }
 
 .session-delete:hover {
@@ -864,8 +914,36 @@ footer {
 .chat-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    padding: 2px 0 14px;
     margin-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.chat-header-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+#chatTitle {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-bright);
+}
+
+.chat-header-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.thinking-control {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-dim);
 }
 
 .chat-header-left {

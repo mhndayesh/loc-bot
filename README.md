@@ -25,13 +25,14 @@
 
 ## ✨ Key Features
 
-*   **Episodic Memory**: A local vector database that allows the agent to learn from past experiences and recall successful solutions JIT (Just-In-Time).
+*   **Short-Term Context Optimization**: Uses a high-efficiency **8,000-character rolling window** to keep the agent fast and lean (token savings of up to 75%).
+*   **Episodic Memory**: A local vector database that allows the agent to learn from past experiences and recall successful solutions JIT (Just-In-Time), ensuring no context is lost even with a smaller rolling window.
 *   **Dreaming (Self-Optimization)**: Periodically summarizes recent logs and extracts high-level "Wisdom" to improve future performance.
+*   **Vivid Session Management**: A high-visibility interface for managing multiple chat sessions, including **Bulk History Deletion** and per-card deletion options.
 *   **Workspace Organization**: Strict enforcement of an `output/` directory for all agent-generated content to maintain a clean root.
 *   **Tool Use**: Can read/write files, run shell commands, and manage system processes.
-*   **Environment Management**: Creates and manages isolated Python/Node.js environments for safe execution.
+*   **High-Visibility GUI**: Bold, high-contrast action buttons (CLEAR HISTORY, Dream Now, STOP) designed for maximum clarity and safety.
 *   **Dynamic Settings**: Real-time adjustment of LLM parameters (Context, Tokens, Heartbeat) via the GUI.
-*   **Identity Protection**: "Constitutional" safeguards prevent the agent from accidentally deleting its own instructions.
 
 ## 📚 Documentation
 

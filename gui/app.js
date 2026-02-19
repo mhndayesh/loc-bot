@@ -190,6 +190,14 @@ function populateSettings(config) {
     settingsPopulated = true;
 
     // Model select — set current value or add it as option
+    const modelSelect = document.getElementById('settingModel');
+    const currentModel = config.model || '';
+    if (currentModel && !modelSelect.querySelector(`option[value="${currentModel}"]`)) {
+        const opt = document.createElement('option');
+        opt.value = currentModel;
+        opt.textContent = currentModel;
+        modelSelect.appendChild(opt);
+    }
     modelSelect.value = currentModel;
 
     // Embedding Model select
@@ -271,6 +279,7 @@ async function toggleHeartbeat() {
         await api('/api/heartbeat/start', 'POST');
         toast('♥ Heartbeat started');
     }
+    // No need to manually save here, the server-side endpoints will handle config persistence
     fetchStatus();
 }
 
@@ -605,7 +614,9 @@ async function fetchSessions() {
                     <span>${s.created || ''}</span>
                     <span>${s.message_count || 0} msgs</span>
                 </div>
-                <span class="session-delete" onclick="event.stopPropagation(); deleteSession('${s.id}')" title="Delete">🗑</span>
+                <span class="session-delete" onclick="event.stopPropagation(); deleteSession('${s.id}')" title="Delete" style="color: #ef4444; opacity: 0.9;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                </span>
             </div>
         `).join('');
     } catch (e) {
@@ -702,6 +713,16 @@ async function deleteSession(sid) {
     }
     fetchSessions();
     toast('🗑 Session deleted');
+}
+
+async function deleteAllSessions() {
+    if (!confirm('⚠️ Are you sure you want to delete ALL chat history? This cannot be undone.')) return;
+    await api('/api/chat/delete_all', 'POST', {});
+    currentSessionId = null;
+    localStorage.removeItem('lastSessionId');
+    newChat();
+    fetchSessions();
+    toast('🗑 All history cleared');
 }
 
 // ── File Attachments ──────────────────────────────────────────────────
@@ -929,8 +950,9 @@ async function sendChat() {
     sendBtn.disabled = false;
     input.focus();
 
-    // Auto-save session periodically (every 4 messages)
-    if (chatHistory.length % 4 === 0) {
+    // Auto-save session periodically
+    // Save on 1st message to ensure it appears in sidebar, then every 2 messages
+    if (chatHistory.length === 1 || chatHistory.length % 2 === 0) {
         saveSession();
     }
 }

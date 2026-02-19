@@ -14,14 +14,14 @@
       "default_model": "bullmoose-0.1-llama-3-8b-alpha"
     }
   },
-  "model": "deepseek/deepseek-r1-0528-qwen3-8b",
+  "model": "ibm/granite-4-h-tiny",
   "temperature": 0.1,
-  "num_ctx": 4096,
+  "num_ctx": 32768,
   "max_tokens": 0,
   "thinking_enabled": true,
   "embedding_provider": "lmstudio",
   "embedding_model": "text-embedding-nomic-embed-text-v1.5",
-  "heartbeat_interval": 60,
+  "heartbeat_interval": 600,
   "permissions": {
     "run_command": true,
     "write_file": true,
@@ -33,5 +33,6 @@
     "compact_memory": true,
     "update_state": true
   },
-  "test_key": "test_value"
+  "test_key": "test_value",
+  "heartbeat_running": false
 }
