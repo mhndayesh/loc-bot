@@ -27,10 +27,16 @@ class LoopDetector:
         result_hash = self._hash(str(result)[:1000])
         args_hash = self._hash(args)
         
+        error_text = None
+        if isinstance(result, str) and ("Error" in result or "Exception" in result or "failed" in result.lower()):
+            error_text = result[:2000]
+            
         entry = {
             "name": tool_name,
             "args_hash": args_hash,
-            "result_hash": result_hash
+            "result_hash": result_hash,
+            "error_text": error_text,
+            "error_embedding": None
         }
         self.history.append(entry)
         if len(self.history) > self.max_history:
@@ -57,6 +63,30 @@ class LoopDetector:
                 h[-2]["name"] == h[-4]["name"] and h[-2]["args_hash"] == h[-4]["args_hash"] and
                 h[-1]["name"] != h[-2]["name"]):
                  return f"SYSTEM ALERT: Loop Detected. You are oscillating between '{h[-1]['name']}' and '{h[-2]['name']}'. STOP. Decide on a single path or try something new."
+
+        # 3. Soft Repetition (Semantic Similarity on Errors)
+        if len(h) >= 3:
+            e1, e2, e3 = h[-1]["error_text"], h[-2]["error_text"], h[-3]["error_text"]
+            if e1 and e2 and e3:
+                import memory
+                # Embed lazily
+                if not h[-1]["error_embedding"]: h[-1]["error_embedding"] = memory.maker.encode(e1)
+                if not h[-2]["error_embedding"]: h[-2]["error_embedding"] = memory.maker.encode(e2)
+                if not h[-3]["error_embedding"]: h[-3]["error_embedding"] = memory.maker.encode(e3)
+                
+                v1, v2, v3 = h[-1]["error_embedding"], h[-2]["error_embedding"], h[-3]["error_embedding"]
+                if v1 is not None and v2 is not None and v3 is not None:
+                    def cos_sim(a, b):
+                        dot = sum(x*y for x, y in zip(a, b))
+                        mag_a = sum(x*x for x in a)**0.5
+                        mag_b = sum(x*x for x in b)**0.5
+                        return dot / (mag_a * mag_b) if mag_a and mag_b else 0
+                        
+                    sim1_2 = cos_sim(v1, v2)
+                    sim2_3 = cos_sim(v2, v3)
+                    
+                    if sim1_2 > 0.90 and sim2_3 > 0.90:
+                        return f"SYSTEM ALERT: Soft Loop Detected! You have encountered semantically identical errors 3 times in a row (Similarity > 0.90). Your current approach is fundamentally failing. STOP and completely RETHINK your strategy."
 
         return None
 
@@ -625,11 +655,14 @@ class AgentEngine:
 
         # 4. Mandatory Rules & Tools (Ultra-Lean Fallback)
         # We only keep the absolute bare minimum to prevent total collapse if DB fails
+        skills_text = self._read_file_safe(os.path.join(BASE_DIR, "SKILLS.md"), "No skills loaded.")
         parts.append(
-            "## Rules\n"
+            "## Rules & Tools\n"
             "1. Reason in `[THINK]...[/THINK]`.\n"
             "2. Actions MUST use `[TOOL] name(args) [/TOOL]` syntax.\n"
-            "3. Refer to MAP.md for identity.\n"
+            "3. Refer to MAP.md for identity.\n\n"
+            "## Available Tools\n"
+            f"{skills_text}"
         )
 
         # 5. Current State

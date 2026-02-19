@@ -727,6 +727,10 @@ class AgentAPIHandler(SimpleHTTPRequestHandler):
             
             # --- JIT MEMORY RECALL (Core Intelligence) ---
             # Search for semantically similar past experiences for the GUI chat
+            num_ctx = config.get("num_ctx", 2048)
+            max_rag_chars = max(2048, int(num_ctx * 1.5))
+            past_wisdom = memory.recall(user_msg, max_chars=max_rag_chars)
+
             if past_wisdom:
                 log.info("💡 [Memory/Chat] Injecting past wisdom into GUI context.")
                 sys_prompt += f"\n\n## Past Experience (Wisdom)\nYou have solved a similar problem before. Use this to avoid repeating mistakes:\n---\n{past_wisdom}\n---\n"
@@ -754,9 +758,9 @@ class AgentAPIHandler(SimpleHTTPRequestHandler):
             try:
                 p = urlparse(base_url)
                 if p.scheme == "https":
-                    conn = http.client.HTTPSConnection(p.hostname, p.port or 443, timeout=120)
+                    conn = http.client.HTTPSConnection(p.hostname, p.port or 443, timeout=300)
                 else:
-                    conn = http.client.HTTPConnection(p.hostname, p.port or 11434, timeout=120)
+                    conn = http.client.HTTPConnection(p.hostname, p.port or 11434, timeout=300)
 
                 if fmt == "ollama":
                     endpoint = "/api/chat"
@@ -986,12 +990,15 @@ def _build_chat_system_prompt(thinking_enabled):
     # 2. Workspace
     parts.append(f"## Environment\nOS: Windows\nWorkspace: {BASE_DIR}\nMap: [MAP.md](file:///c:/new-agent-mohannad/MAP.md)")
 
-    # Rules & Tools (Streamlined)
     # Rules & Tools (Streamlined Fallback)
+    skills_text = read_file_safe(os.path.join(BASE_DIR, "SKILLS.md"), "No skills loaded.")
     parts.append(
-        "## Rules\n"
+        "## Rules & Tools\n"
         "1. Reason in `[THINK]...[/THINK]`.\n"
-        "2. Save files to `output/` via `write_file`.\n"
+        "2. Actions MUST use `[TOOL] name(args) [/TOOL]` syntax.\n"
+        "3. Refer to MAP.md for identity.\n\n"
+        "## Available Tools\n"
+        f"{skills_text}"
     )
 
     return "\n\n".join(parts)

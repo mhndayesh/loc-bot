@@ -1125,14 +1125,6 @@ async function sendChat() {
             const result = cleanResponse(rawReply);
             addChatMessage('assistant', result);
             chatHistory.push({ role: 'assistant', content: rawReply }); // Store raw
-
-            // If the agent was stopped/done, its successful reply signifies it's back in action
-            if (state.goal === 'done' || state.status === 'stopped') {
-                console.log('Agent responded to new chat, resetting status...');
-                // Optionally trigger a status reset on server if needed, 
-                // but usually server handles this when /api/chat is called if we want it to.
-                // For now, let's just make sure UI state is updated on next fetch.
-            }
         }
     } catch (e) {
         removeTypingIndicator();
