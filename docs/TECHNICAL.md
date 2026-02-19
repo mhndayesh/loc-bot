@@ -12,6 +12,8 @@ The `server.py` exposes the following REST endpoints (Port 7777 by default).
 *   `GET /api/heartbeat/start`: Start the autonomous loop.
 *   `GET /api/heartbeat/stop`: Stop the autonomous loop.
 *   `POST /api/pulse`: Trigger a single execution step immediately.
+*   `GET /api/chat/history`: Retrieve full session history.
+
 
 ### Chat & Providers
 *   `POST /api/chat`: Send a message to the agent (interactive mode).
@@ -28,10 +30,12 @@ The `server.py` exposes the following REST endpoints (Port 7777 by default).
 The core loop of the agent.
 1.  **Reload State**: `self._load_state()` (Critical for concurrency).
 2.  **Assemble Prompt**: `self.get_full_prompt()`.
-3.  **Call LLM**: `self.call_llm()`.
-4.  **Parse Response**: Uses `ast.literal_eval` for robust argument parsing.
-5.  **Execute Tool**: Dispatches to `run_tool`.
+3.  **Call LLM**: `self.call_llm()` (with 300s socket timeout).
+4.  **Parse Response**: Uses `ast.literal_eval` and regex for robust `[THINK]` and `[TOOL]` extraction.
+5.  **Execute Tool**: Dispatches to `run_tool` (native or JSON-based skills).
 6.  **Log & Save**: Updates `JOURNAL.md` and `state.json`.
+7.  **Semantic Similarity**: Optional cosine-similarity check on errors to prevent loops.
+
 
 ### Environment Management
 *   **Mapping**: `environments.json` tracks created environments.
@@ -43,6 +47,13 @@ The core loop of the agent.
 *   `thinking_enabled`: Boolean. Toggles `<think>` tag usage.
 *   `permissions`: Dict of `tool_name: boolean`.
 
+## Optimization & Performance
+*   **Blackwell Acceleration**: Embeddings run via `onnxruntime-directml` in `memory.py`.
+*   **Context Scaling**: Memory retrieval limits are relative to defined `num_ctx`.
+*   **Socket Timeouts**: Increased to 300s to support heavy reasoning tokens.
+
 ## Dependencies
-*   Python Standard Library (os, json, threading, http.server, subprocess).
-*   No external pip packages required for core function! (Zero-dependency philosophy).
+*   Python Standard Library.
+*   `requests` (optional).
+*   `onnxruntime-directml` (for hardware acceleration).
+

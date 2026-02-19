@@ -25,14 +25,14 @@
 
 ## ✨ Key Features
 
-*   **Short-Term Context Optimization**: Uses a high-efficiency **8,000-character rolling window** to keep the agent fast and lean (token savings of up to 75%).
-*   **Episodic Memory**: A local vector database that allows the agent to learn from past experiences and recall successful solutions JIT (Just-In-Time), ensuring no context is lost even with a smaller rolling window.
-*   **Dreaming (Self-Optimization)**: Periodically summarizes recent logs and extracts high-level "Wisdom" to improve future performance.
-*   **Vivid Session Management**: A high-visibility interface for managing multiple chat sessions, including **Bulk History Deletion** and per-card deletion options.
-*   **Workspace Organization**: Strict enforcement of an `output/` directory for all agent-generated content to maintain a clean root.
-*   **Tool Use**: Can read/write files, run shell commands, and manage system processes.
-*   **High-Visibility GUI**: Bold, high-contrast action buttons (CLEAR HISTORY, Dream Now, STOP) designed for maximum clarity and safety.
-*   **Dynamic Settings**: Real-time adjustment of LLM parameters (Context, Tokens, Heartbeat) via the GUI.
+*   **Blackwell-Ready Embeddings**: Optimized for high-fidelity local RAG using **ONNX DirectML** (RTX 5070 optimized) for zero-latency retrieval.
+*   **Autonomous Resilience**: Advanced **Semantic Loop Detection** prevents repetitive error cycles by analyzing the semantic similarity of execution failures.
+*   **Task Checkpointing**: Automatically save and restore complex agent states during multi-step missions to `workspace/.checkpoints/`.
+*   **Developer Toolkit**: Native skills for **Git Integration** (`git_commit`), **Static Code Analysis** (`flake8`), and **Process Management** (PID tracking/kill).
+*   **Intelligent Context Sizing**: Dynamically balances JIT memory retrieval against the model's native context window (`num_ctx`) to prevent prompt dilution.
+*   **Dreaming (Self-Optimization)**: Periodically summarizes `JOURNAL.md` into `SUMMARY.md` while refining pulse logic.
+*   **High-Visibility GUI**: Persistent controls for "Stop", "Pulse", and "Dream Now" with real-time status and journal tracking.
+
 
 ## 📚 Documentation
 
