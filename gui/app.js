@@ -135,6 +135,14 @@ async function fetchStatus() {
             hbLabel.textContent = 'Start Heartbeat';
         }
 
+        // Stop Button Visual State
+        const btnStop = document.getElementById('btnStop');
+        if (btnStop) {
+            const isStopped = state.status === 'stopped' || state.goal === 'done';
+            btnStop.classList.toggle('working', !isStopped);
+            btnStop.textContent = isStopped ? 'STOPPED' : 'STOP';
+        }
+
         // Settings (populate on first load)
         populateSettings(currentConfig);
 
@@ -149,9 +157,10 @@ async function fetchStatus() {
             if (lastReply.includes('[SILENT_OK]')) {
                 console.log('Filtered silent reply');
             } else {
-                // Avoid duplicates if already shown
+                // Avoid duplicates if already shown (check raw and (Background) variant)
                 const lastMsg = chatHistory[chatHistory.length - 1];
-                if (!lastMsg || lastMsg.content !== lastReply) {
+                const isDuplicate = lastMsg && (lastMsg.content === lastReply || lastMsg.content === `(Background) ${lastReply}`);
+                if (!isDuplicate) {
                     // Parse think/content
                     const result = cleanResponse(lastReply);
                     // Only add if there is actual content or thought
@@ -221,36 +230,182 @@ function populateSettings(config) {
     const thinkToggle = document.getElementById('thinkingToggle');
     if (thinkToggle) thinkToggle.checked = config.thinking_enabled !== false;
 
-    // Provider buttons
-    const active = config.provider || 'ollama';
-    document.getElementById('btnOllama').classList.toggle('active', active === 'ollama');
-    document.getElementById('btnLmstudio').classList.toggle('active', active === 'lmstudio');
+    // Embedding Provider sync
+    const embProvider = config.embedding_provider || 'local';
+    document.getElementById('btnEmbLocal')?.classList.toggle('active', embProvider === 'local');
+    document.getElementById('btnEmbOllama')?.classList.toggle('active', embProvider === 'ollama');
+    document.getElementById('btnEmbLmstudio')?.classList.toggle('active', embProvider === 'lmstudio');
 
-    // Embedding Provider buttons
-    const activeEmb = config.embedding_provider || 'local';
-    document.getElementById('btnEmbLocal')?.classList.toggle('active', activeEmb === 'local');
-    document.getElementById('btnEmbOllama')?.classList.toggle('active', activeEmb === 'ollama');
-    document.getElementById('btnEmbLmstudio')?.classList.toggle('active', activeEmb === 'lmstudio');
+    // Provider buttons (dynamic)
+    const providerToggle = document.getElementById('providerToggle');
+    if (providerToggle) {
+        const active = config.provider || 'ollama';
+        const providers = config.providers || {};
+        providerToggle.innerHTML = Object.entries(providers).map(([key, p]) => {
+            const isActive = key === active;
+            let displayUrl = (p.base_url || '').replace(/^https?:\/\//, '').split('/')[0];
+            return `
+                <button id="btn_${key}" class="provider-btn ${isActive ? 'active' : ''}" onclick="switchProvider('${key}')">
+                    <div class="provider-icon">${key === 'ollama' ? '🦙' : key === 'lmstudio' ? '🔬' : '🛠️'}</div>
+                    <div class="provider-name">${p.name || key.charAt(0).toUpperCase() + key.slice(1)}</div>
+                    <div class="provider-url">${displayUrl}</div>
+                </button>
+            `;
+        }).join('');
+    }
 
-    // Provider URLs
-    const providers = config.providers || {};
-    document.getElementById('ollamaUrl').value = providers.ollama?.base_url || '';
-    document.getElementById('lmstudioUrl').value = providers.lmstudio?.base_url || '';
-    document.getElementById('ollamaKey').value = providers.ollama?.api_key || '';
-    document.getElementById('lmstudioKey').value = providers.lmstudio?.api_key || '';
+    // Dynamic Provider Settings
+    renderProviderSettings(config.providers || {});
 
     // Permissions
     const perms = config.permissions || {};
     const grid = document.getElementById('permissionsGrid');
-    grid.innerHTML = Object.entries(perms).map(([name, enabled]) =>
-        `<div class="perm-item">
-            <span class="perm-name">${name}</span>
-            <label class="toggle">
-                <input type="checkbox" data-perm="${name}" ${enabled ? 'checked' : ''} />
-                <span class="slider"></span>
-            </label>
-        </div>`
-    ).join('');
+    if (grid) {
+        grid.innerHTML = Object.entries(perms).map(([name, enabled]) =>
+            `<div class="perm-item">
+                <span class="perm-name">${name}</span>
+                <label class="toggle">
+                    <input type="checkbox" data-perm="${name}" ${enabled ? 'checked' : ''} />
+                    <span class="slider"></span>
+                </label>
+            </div>`
+        ).join('');
+    }
+}
+
+function renderProviderSettings(providers) {
+    const container = document.getElementById('providerSettingsContainer');
+    if (!container) return;
+
+    container.innerHTML = Object.entries(providers).map(([key, p]) => {
+        const isStandard = ['ollama', 'lmstudio'].includes(key);
+
+        if (isStandard) {
+            // Revert to simple "Base URL" format for standard providers
+            return `
+                <div class="provider-config-block card" style="background: rgba(255,255,255,0.02); border-color: rgba(255,255,255,0.05); margin-bottom: 24px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <h4 style="margin:0; font-size: 14px; color: var(--accent);">${p.name || key.charAt(0).toUpperCase() + key.slice(1)}</h4>
+                        <button class="btn btn-small" onclick="fetchModels()">Fetch Models</button>
+                    </div>
+                    <div class="settings-grid">
+                        <div class="setting-item" style="grid-column: span 2;">
+                            <label>Base URL</label>
+                            <input type="text" data-provider-key="${key}" data-field="base_url" value="${p.base_url || ''}" placeholder="http://localhost:..." />
+                        </div>
+                        <div class="setting-item" style="grid-column: span 2;">
+                            <label>API Key</label>
+                            <input type="text" data-provider-key="${key}" data-field="api_key" value="${p.api_key || ''}" />
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Keep granular format only for Custom providers
+        let host = 'localhost';
+        let port = '';
+        let path = '';
+        let protocol = 'http';
+
+        try {
+            const urlStr = p.base_url.includes('://') ? p.base_url : 'http://' + p.base_url;
+            const url = new URL(urlStr);
+            host = url.hostname;
+            port = url.port;
+            path = url.pathname;
+            protocol = url.protocol.replace(':', '');
+        } catch (e) {
+            console.warn('Failed to parse URL for provider:', key, p.base_url);
+        }
+
+        return `
+            <div class="provider-config-block card" style="background: rgba(255,255,255,0.02); border-color: rgba(255,255,255,0.05); margin-bottom: 24px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                    <h4 style="margin:0; font-size: 14px; color: var(--accent);">${p.name || key.charAt(0).toUpperCase() + key.slice(1)}</h4>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-small" onclick="fetchModels()">Fetch Models</button>
+                        <button class="btn btn-small btn-danger" onclick="deleteProvider('${key}')">Remove</button>
+                    </div>
+                </div>
+                <div class="settings-grid">
+                    <div class="setting-item">
+                        <label>Protocol</label>
+                        <select data-provider-key="${key}" data-field="protocol">
+                            <option value="http" ${protocol === 'http' ? 'selected' : ''}>http</option>
+                            <option value="https" ${protocol === 'https' ? 'selected' : ''}>https</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label>Host</label>
+                        <input type="text" data-provider-key="${key}" data-field="host" value="${host}" placeholder="localhost" />
+                    </div>
+                    <div class="setting-item">
+                        <label>Port</label>
+                        <input type="text" data-provider-key="${key}" data-field="port" value="${port}" placeholder="8000" />
+                    </div>
+                    <div class="setting-item">
+                        <label>Base Path</label>
+                        <input type="text" data-provider-key="${key}" data-field="path" value="${path}" placeholder="/v1" />
+                    </div>
+                    <div class="setting-item">
+                        <label>API Key</label>
+                        <input type="text" data-provider-key="${key}" data-field="api_key" value="${p.api_key || ''}" />
+                    </div>
+                    <div class="setting-item">
+                        <label>API Format</label>
+                        <select data-provider-key="${key}" data-field="api_format">
+                            <option value="openai" ${p.api_format === 'openai' ? 'selected' : ''}>OpenAI Compatible</option>
+                            <option value="ollama" ${p.api_format === 'ollama' ? 'selected' : ''}>Ollama Native</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label>Default Model</label>
+                        <input type="text" data-provider-key="${key}" data-field="default_model" value="${p.default_model || ''}" />
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+async function addProvider() {
+    const name = prompt("Enter a name for the new provider (e.g. Ouro):");
+    if (!name) return;
+    const key = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+
+    const config = { ...currentConfig };
+    config.providers = config.providers || {};
+    if (config.providers[key]) {
+        alert("A provider with this name already exists.");
+        return;
+    }
+
+    config.providers[key] = {
+        name: name,
+        base_url: "http://localhost:8000/v1",
+        api_format: "openai",
+        api_key: "sk-...",
+        default_model: "model-name"
+    };
+
+    await api('/api/config', 'POST', { providers: config.providers });
+    settingsPopulated = false;
+    toast('✓ Added provider: ' + name);
+    fetchStatus();
+}
+
+async function deleteProvider(key) {
+    if (!confirm(`Are you sure you want to remove the provider '${key}'?`)) return;
+
+    const config = { ...currentConfig };
+    if (config.provider === key) config.provider = 'ollama';
+    delete config.providers[key];
+
+    await api('/api/config', 'POST', { providers: config.providers, provider: config.provider });
+    settingsPopulated = false;
+    toast('✓ Removed provider: ' + key);
+    fetchStatus();
 }
 
 // ── Actions ───────────────────────────────────────────────────────────
@@ -310,11 +465,11 @@ async function setGoal() {
 
 async function switchProvider(provider) {
     await api('/api/provider', 'POST', { provider });
-    document.getElementById('btnOllama').classList.toggle('active', provider === 'ollama');
-    document.getElementById('btnLmstudio').classList.toggle('active', provider === 'lmstudio');
     settingsPopulated = false;
-    toast('✓ Switched LLM Provider to ' + (provider === 'ollama' ? 'Ollama' : 'LM Studio'));
+    toast('✓ Switched LLM Provider to ' + provider);
     fetchStatus();
+    // Auto-fetch models for the new provider
+    setTimeout(fetchModels, 500);
 }
 
 async function switchEmbeddingProvider(provider) {
@@ -330,6 +485,7 @@ async function switchEmbeddingProvider(provider) {
 async function saveSettings() {
     const update = {
         model: document.getElementById('settingModel').value,
+        embedding_provider: document.querySelector('.provider-toggle.small-toggle .provider-btn.active')?.id.replace('btnEmb', '').toLowerCase() || 'local',
         embedding_model: document.getElementById('settingEmbModel').value,
         temperature: parseFloat(document.getElementById('settingTemp').value),
         num_ctx: parseInt(document.getElementById('settingCtx').value),
@@ -429,20 +585,41 @@ async function clearScratchpad() {
 
 async function saveProviderUrls() {
     const config = { ...currentConfig };
-    config.providers = config.providers || {};
-    config.providers.ollama = {
-        ...config.providers.ollama,
-        base_url: document.getElementById('ollamaUrl').value,
-        api_key: document.getElementById('ollamaKey').value,
-    };
-    config.providers.lmstudio = {
-        ...config.providers.lmstudio,
-        base_url: document.getElementById('lmstudioUrl').value,
-        api_key: document.getElementById('lmstudioKey').value,
-    };
-    await api('/api/config', 'POST', { providers: config.providers });
+    const providers = {};
+
+    // Collect all dynamic inputs
+    document.querySelectorAll('[data-provider-key]').forEach(input => {
+        const key = input.dataset.providerKey;
+        const field = input.dataset.field;
+        providers[key] = providers[key] || {};
+        providers[key][field] = input.value;
+    });
+
+    // Re-combine URLs
+    Object.entries(providers).forEach(([key, p]) => {
+        const isStandard = ['ollama', 'lmstudio'].includes(key);
+
+        if (!isStandard) {
+            const proto = p.protocol || 'http';
+            const host = p.host || 'localhost';
+            const port = p.port ? `:${p.port}` : '';
+            const path = p.path || '';
+
+            let cleanPath = path;
+            if (cleanPath && !cleanPath.startsWith('/')) cleanPath = '/' + cleanPath;
+
+            p.base_url = `${proto}://${host}${port}${cleanPath}`;
+
+            delete p.protocol;
+            delete p.host;
+            delete p.port;
+            delete p.path;
+        }
+    });
+
+    await api('/api/config', 'POST', { providers });
     settingsPopulated = false;
-    toast('✓ Provider URLs saved');
+    toast('✓ Provider configurations saved');
     fetchStatus();
 }
 
@@ -470,8 +647,6 @@ function initSettings() {
         });
     }
     document.getElementById('thinkingToggle')?.addEventListener('change', toggleThinking);
-    document.getElementById('btnOllama')?.addEventListener('click', () => switchProvider('ollama'));
-    document.getElementById('btnLmstudio')?.addEventListener('click', () => switchProvider('lmstudio'));
     document.getElementById('btnFetchModels')?.addEventListener('click', fetchModels);
     document.getElementById('btnSaveProviderUrls')?.addEventListener('click', saveProviderUrls);
     document.getElementById('permissionsGrid')?.addEventListener('change', e => {
@@ -488,24 +663,33 @@ function escHtml(s) {
 
 function cleanResponse(text) {
     // Return object { content, thought }
-    let thought = '';
+    let thoughts = [];
     let content = text || '';
 
-    // Extract ALL [THINK] blocks and concatenate them
+    // 1. Extract ALL [THINK] blocks
     const thinkRegex = /\[THINK\]([\s\S]*?)\[\/THINK\]/gi;
     let match;
     while ((match = thinkRegex.exec(content)) !== null) {
-        thought += match[1].trim() + '\n';
+        thoughts.push(match[1].trim());
     }
     // Remove ALL [THINK] blocks from content
     content = content.replace(thinkRegex, '');
 
-    // Extract <think> (Ollama / DeepSeek style)
+    // 2. Extract <think> (Ollama / DeepSeek style)
     const xmlRegex = /<think>([\s\S]*?)<\/think>/gi;
     while ((match = xmlRegex.exec(content)) !== null) {
-        thought += match[1].trim() + '\n';
+        const t = match[1].trim();
+        // Avoid adding if same thought already captured via [THINK] (common in nested cases)
+        if (!thoughts.includes(t)) {
+            thoughts.push(t);
+        }
     }
     content = content.replace(xmlRegex, '');
+
+    // 3. Final cleanup of joined thoughts - remove nested tags that might have leaked
+    let finalThought = thoughts.join('\n---\n').trim();
+    finalThought = finalThought.replace(/\[\/?THINK\]/gi, '');
+    finalThought = finalThought.replace(/<think>|<\/think>/gi, '');
 
     // Check if a tool was used (to provide a placeholder if content is empty)
     const hasTool = /\[TOOL\]/gi.test(content);
@@ -524,12 +708,12 @@ function cleanResponse(text) {
     if (!content) {
         if (hasTool) {
             content = "*Performing action...*";
-        } else if (thought) {
+        } else if (finalThought) {
             content = "*Thinking...*";
         }
     }
 
-    return { content, thought: thought.trim() };
+    return { content, thought: finalThought.trim() };
 }
 
 function parseMarkdown(text) {
@@ -941,6 +1125,14 @@ async function sendChat() {
             const result = cleanResponse(rawReply);
             addChatMessage('assistant', result);
             chatHistory.push({ role: 'assistant', content: rawReply }); // Store raw
+
+            // If the agent was stopped/done, its successful reply signifies it's back in action
+            if (state.goal === 'done' || state.status === 'stopped') {
+                console.log('Agent responded to new chat, resetting status...');
+                // Optionally trigger a status reset on server if needed, 
+                // but usually server handles this when /api/chat is called if we want it to.
+                // For now, let's just make sure UI state is updated on next fetch.
+            }
         }
     } catch (e) {
         removeTypingIndicator();
@@ -1090,3 +1282,16 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
+async function stopAgent() {
+    console.log('Stopping agent...');
+    try {
+        const res = await api('/api/stop', 'POST');
+        if (res.ok) {
+            toast('🛑 Agent Stopped');
+            fetchStatus();
+        }
+    } catch (e) {
+        toast('✗ Failed to stop agent');
+    }
+}

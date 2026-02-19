@@ -13,6 +13,8 @@
 - `create_plan(steps)`: Create a list of steps.
 - `update_plan_step(idx, status)`: Mark step as done/failed.
 - `replan(start_idx, new_steps)`: Replace future steps.
+- `recall(query)`: Search semantically similar past experiences.
+- `memorize(content)`: Save important info to long-term memory.
 
 ## Custom Skills (in skills/)
 - `__init__.py`: Custom tool.

@@ -276,17 +276,11 @@
         <div class="card">
             <h3>LLM Provider</h3>
             <p class="card-desc">Switch between Ollama and LM Studio with one click.</p>
-            <div class="provider-toggle">
-                <button id="btnOllama" class="provider-btn active" onclick="switchProvider('ollama')">
-                    <div class="provider-icon">🦙</div>
-                    <div class="provider-name">Ollama</div>
-                    <div class="provider-url">localhost:11434</div>
-                </button>
-                <button id="btnLmstudio" class="provider-btn" onclick="switchProvider('lmstudio')">
-                    <div class="provider-icon">🔬</div>
-                    <div class="provider-name">LM Studio</div>
-                    <div class="provider-url">localhost:1234</div>
-                </button>
+            <div id="providerToggle" class="provider-toggle">
+                <!-- Dynamically populated -->
+            </div>
+            <div style="margin-top: 12px; display: flex; justify-content: flex-end;">
+                <button class="btn btn-small" onclick="addProvider()">+ Add Provider</button>
             </div>
         </div>
 
@@ -391,29 +385,14 @@
             </div>
         </div>
 
-        <!-- Provider URLs -->
         <div class="card">
-            <h3>Provider URLs</h3>
-            <p class="card-desc">Customize API endpoints for each provider.</p>
-            <div class="settings-grid">
-                <div class="setting-item">
-                    <label for="ollamaUrl">Ollama Base URL</label>
-                    <input type="text" id="ollamaUrl" placeholder="http://localhost:11434" />
-                </div>
-                <div class="setting-item">
-                    <label for="lmstudioUrl">LM Studio Base URL</label>
-                    <input type="text" id="lmstudioUrl" placeholder="http://localhost:1234" />
-                </div>
-                <div class="setting-item">
-                    <label for="ollamaKey">Ollama API Key</label>
-                    <input type="text" id="ollamaKey" placeholder="ollama" />
-                </div>
-                <div class="setting-item">
-                    <label for="lmstudioKey">LM Studio API Key</label>
-                    <input type="text" id="lmstudioKey" placeholder="lm-studio" />
-                </div>
+            <h3>Provider Configurations</h3>
+            <p class="card-desc">Customize API endpoints, Host, Port, and Keys for each provider.</p>
+            <div id="providerSettingsContainer">
+                <!-- Dynamically populated -->
             </div>
-            <button class="btn btn-primary" style="margin-top:16px" onclick="saveProviderUrls()">Save URLs</button>
+            <button class="btn btn-primary" style="margin-top:16px" onclick="saveProviderUrls()">Save All Provider
+                Settings</button>
         </div>
 
         <!-- Permissions -->

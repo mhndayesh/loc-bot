@@ -1,0 +1,57 @@
+# Ouro OpenAI-Compatible API Information
+
+## Server Address
+- **Base URL:** http://localhost:8000/v1
+- **Chat Endpoint:** http://localhost:8000/v1/chat/completions
+- **Embeddings Endpoint:** http://localhost:8000/v1/embeddings
+- **Models Endpoint:** http://localhost:8000/v1/models
+
+## Calling Format (OpenAI Standard)
+This server now uses the official OpenAI format and runs on **Port 8000**.
+
+**Request (POST):**
+```json
+{
+  "model": "ouro-2.6b-thinking",
+  "messages": [
+    {"role": "user", "content": "Hello!"}
+  ],
+  "temperature": 0.7,
+  "max_tokens": 512
+}
+```
+
+**Response:**
+```json
+{
+  "id": "chatcmpl-...",
+  "object": "chat.completion",
+  "created": 1700000000,
+  "model": "ouro-2.6b-thinking",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "Hello! How can I help you today?"
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 10,
+    "completion_tokens": 8,
+    "total_tokens": 18
+  }
+}
+```
+
+## Example Curl Command
+```bash
+curl http://localhost:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "ouro-2.6b-thinking",
+    "messages": [{"role": "user", "content": "Tell me a joke."}]
+  }'
+```

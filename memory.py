@@ -27,9 +27,11 @@ class MemoryMaker:
     """Handles text-to-vector encoding via multiple providers."""
     def __init__(self, config):
         self.provider = config.get("embedding_provider", "local")
-        self.model_name = config.get("embedding_model", "all-MiniLM-L6-v2")
+        self.model_name = config.get("embedding_model", "BAAI/bge-large-en-v1.5")
         self.config = config
         self._local_model = None
+        self._onnx_model = None
+        self._tokenizer = None
 
     def encode(self, text):
         res = None
@@ -46,10 +48,79 @@ class MemoryMaker:
     def _encode_local(self, text):
         try:
             if self._local_model is None:
+                # TRY ONNX FIRST FOR BLACKWELL GPU SUPPORT
+                onnx_path = os.path.join(BASE_DIR, "knowledge", "bge_large_onnx")
+                model_file = os.path.join(onnx_path, "model.onnx")
+                if os.path.exists(onnx_path) and os.path.exists(model_file):
+                    try:
+                        logger.info(f"FORCING BLACKWELL GPU (DirectML)...")
+                        from transformers import AutoTokenizer
+                        import onnxruntime as ort
+                        import torch
+                        
+                        self._tokenizer = AutoTokenizer.from_pretrained(onnx_path)
+                        # Explicitly use DirectML
+                        providers = ["DmlExecutionProvider", "CPUExecutionProvider"]
+                        self._onnx_model = ort.InferenceSession(model_file, providers=providers)
+                        
+                        class RobustONNXWrapper:
+                            def __init__(self, session, tokenizer):
+                                self.session = session
+                                self.tokenizer = tokenizer
+                                self.device = torch.device("cpu")
+                                self.output_names = [o.name for o in session.get_outputs()]
+                                logger.info(f"ONNX Session Ready. Device: {session.get_providers()}. Outputs: {self.output_names}")
+                                
+                            def encode(self, sentences):
+                                if isinstance(sentences, str): sentences = [sentences]
+                                # Return as numpy
+                                inputs = self.tokenizer(sentences, padding=True, truncation=True, return_tensors="np")
+                                # Filter valid keys for ORT
+                                valid_keys = [i.name for i in self.session.get_inputs()]
+                                ort_inputs = {k: v.astype(np.int64) for k, v in inputs.items() if k in valid_keys}
+                                
+                                outputs = self.session.run(None, ort_inputs)
+                                
+                                # Heuristic for sentence embedding (usually index 1 in BGE-Large)
+                                for i, name in enumerate(self.output_names):
+                                    if name == "sentence_embedding": return outputs[i]
+                                return outputs[1] if len(outputs) > 1 else outputs[0]
+                        
+                        self._local_model = RobustONNXWrapper(self._onnx_model, self._tokenizer)
+                        # Test call to verify it really works on GPU
+                        _test = self._local_model.encode("warmup")
+                        return self._local_model.encode(text)[0].tolist()
+                    except Exception as ort_err:
+                        import traceback
+                        logger.warning(f"Forced GPU (DML) failed: {ort_err}\n{traceback.format_exc()}")
+
                 from sentence_transformers import SentenceTransformer
-                logger.info(f"Loading local embedding model: {self.model_name}")
-                self._local_model = SentenceTransformer(self.model_name)
-            return self._local_model.encode(text).tolist()
+                import torch
+                # Determine device
+                device = "cpu"
+                if torch.cuda.is_available():
+                    try:
+                        torch.zeros(1).cuda()
+                        device = "cuda"
+                    except:
+                        logger.warning("CUDA detected but incompatible with PyTorch kernels. Use ONNX for GPU.")
+                
+                logger.info(f"Loading local embedding model: {self.model_name} on {device}")
+                self._local_model = SentenceTransformer(self.model_name, device=device)
+            
+            # Standardize output to a 1D list
+            result = self._local_model.encode(text)
+            if hasattr(result, "numpy"): result = result.numpy() # Handle torch tensors if any
+            
+            # If it's a numpy array or similar
+            if hasattr(result, "tolist"):
+                res_list = result.tolist()
+                # flatten if 2D (batch of 1)
+                if isinstance(res_list, list) and len(res_list) > 0 and isinstance(res_list[0], list):
+                    return res_list[0]
+                return res_list
+            
+            return list(result)
         except Exception as e:
             logger.error(f"Local encoding failed: {e}")
             return None
@@ -168,7 +239,7 @@ class VectorVault:
 
                 # 3. Dimension Check
                 if self.data and len(self.data[0]["vector"]) != len(vector):
-                    logger.warning("Embedding dimension mismatch. Clearing vault.")
+                    logger.warning(f"Embedding dimension mismatch: Vault({len(self.data[0]['vector'])}) vs New({len(vector)}). Clearing vault.")
                     self.data = []
 
                 entry = {
@@ -190,7 +261,7 @@ class VectorVault:
 
         # Dimension Check for Query
         if len(self.data[0]["vector"]) != len(query_vec):
-            logger.warning("Query dimension mismatch. Clearing incompatible vault.")
+            logger.warning(f"Query dimension mismatch: Vault({len(self.data[0]['vector'])}) vs Query({len(query_vec)}). Clearing incompatible vault.")
             self.data = []
             self.save()
             return []
@@ -216,8 +287,9 @@ class VectorVault:
         return results[:n_results]
 
 vault = VectorVault(MEMORY_STORAGE_FILE)
+instruction_vault = VectorVault(os.path.join(BASE_DIR, "instructions.json"))
 
-def recall(query_text, n_results=1, similarity_threshold=0.5):
+def recall(query_text, n_results=1, similarity_threshold=0.5, max_chars=None):
     logger.info(f"Recalling for: {query_text[:50]}...")
     matches = vault.query(query_text, n_results=n_results)
     if not matches: 
@@ -228,7 +300,12 @@ def recall(query_text, n_results=1, similarity_threshold=0.5):
     if best["score"] < similarity_threshold:
         return None
     logger.info(f"💡 [Memory] Found solution (score: {best['score']:.2f})")
-    return best["entry"]["text"]
+    
+    text = best["entry"]["text"]
+    if max_chars and len(text) > max_chars:
+        logger.info(f"Memory truncated from {len(text)} to {max_chars} chars to fit context.")
+        text = text[:max_chars] + "... (truncated)"
+    return text
 
 def memorize(problem, solution, rating=5):
     if rating < 4: return
@@ -242,8 +319,33 @@ def memorize(problem, solution, rating=5):
 
     return vault.add(text, {"rating": rating})
 
+def recall_instructions(query_text, n_results=2, similarity_threshold=0.5, max_chars=None):
+    """Retrieve relevant system instructions based on query."""
+    logger.info(f"Recalling instructions for: {query_text[:50]}...")
+    matches = instruction_vault.query(query_text, n_results=n_results)
+    if not matches: return None
+    
+    # Filter by threshold
+    valid = [m for m in matches if m["score"] >= similarity_threshold]
+    if not valid: return None
+    
+    # Return concatenated instructions safely
+    text = "\n\n".join([m["entry"]["text"] for m in valid])
+    if max_chars and len(text) > max_chars:
+        logger.info(f"Instructions truncated from {len(text)} to {max_chars} chars to fit context.")
+        text = text[:max_chars] + "... (truncated)"
+    return text
+
+def learn_instruction(text):
+    """Add a new instruction to the system prompt database."""
+    # Check duplicates strictly
+    for entry in instruction_vault.data:
+        if entry.get("text") == text:
+            return entry["id"]
+    return instruction_vault.add(text, {"type": "instruction"})
+
 def get_stats():
-    return f"Memory (Provider: {maker.provider}). Entries: {len(vault.data)}"
+    return f"Memory (Provider: {maker.provider}). Entries: {len(vault.data)} | Instructions: {len(instruction_vault.data)}"
 
 if __name__ == "__main__":
     print(get_stats())

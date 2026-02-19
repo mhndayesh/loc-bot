@@ -7,6 +7,7 @@ import json
 import threading
 import time
 import http.client
+from socketserver import ThreadingMixIn
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 import logging
@@ -32,6 +33,10 @@ LOG_BUFFER = collections.deque(maxlen=2000)
 
 # Attach buffer handler to root logger
 # REMOVED BufferHandler to avoid duplication with ConsoleInterceptor
+
+class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
+    """Multi-threaded HTTP server for stability."""
+    daemon_threads = True
 
 import sys
 class ConsoleInterceptor:
@@ -148,6 +153,23 @@ def load_config(path=CONFIG_FILE):
     return cfg
 
 
+def get_latest_session_id():
+    """Find the most recently modified session in chat_sessions/."""
+    sessions_dir = os.path.join(MEMORY_DIR, "chat_sessions")
+    if not os.path.exists(sessions_dir):
+        return None
+    try:
+        files = [f for f in os.listdir(sessions_dir) if f.endswith(".json")]
+        if not files:
+            return None
+        # Sort by modification time
+        files.sort(key=lambda f: os.path.getmtime(os.path.join(sessions_dir, f)), reverse=True)
+        return files[0].replace(".json", "")
+    except Exception as e:
+        log.warning("Failed to find latest session: %s", e)
+        return None
+
+
 def run_heartbeat():
     """Run the engine in a heartbeat loop in a background thread."""
     global heartbeat_running
@@ -204,8 +226,16 @@ def run_heartbeat():
                 has_memories = True
             elif os.path.exists(MEMORY_DIR) and any(f.startswith("pulse_") for f in os.listdir(MEMORY_DIR)):
                 has_memories = True
+            
+            # Check for unfinished plan steps
+            has_pending_plan = False
+            plan = state.get("plan", [])
+            for step in plan:
+                if step.get("status") in ("todo", "in_progress"):
+                    has_pending_plan = True
+                    break
 
-            should_pulse = is_active or status in ("working", "recovering") or has_memories
+            should_pulse = is_active or status in ("working", "recovering") or has_memories or has_pending_plan
             
             if not should_pulse:
                 # Zero-Cost Idle: Don't spawn engine if nothing to do
@@ -224,10 +254,34 @@ def run_heartbeat():
                             if "SILENT REPLY" in line:
                                 is_silent = True
                     
-                    # If silent, force wait the full base_interval even if goal is active
                     if is_silent:
                         log.info("Engine was silent. Applying backoff sleep: %ds", base_interval)
                         interval = base_interval
+                    else:
+                        # PERSISTENCE: Save heartbeat reply to the active chat session
+                        try:
+                            sid = get_latest_session_id()
+                            if sid:
+                                state_after = load_json(STATE_FILE)
+                                reply = state_after.get("last_reply")
+                                if reply:
+                                    # Format with OpenClaw-inspired clarity
+                                    if not reply.startswith("(Background)"):
+                                        reply = f"(Background) {reply}"
+                                    
+                                    sessions_dir = os.path.join(MEMORY_DIR, "chat_sessions")
+                                    session_path = os.path.join(sessions_dir, f"{sid}.json")
+                                    session = load_json(session_path)
+                                    
+                                    msgs = session.get("messages", [])
+                                    # Deduplication check
+                                    if not msgs or msgs[-1].get("content") != reply:
+                                        msgs.append({"role": "assistant", "content": reply})
+                                        session["messages"] = msgs
+                                        save_json(session_path, session)
+                                        log.info("Persistent Memory: Heartbeat reply saved to session %s", sid)
+                        except Exception as pe:
+                            log.warning("Persistence error in heartbeat: %s", pe)
             
         except Exception as e:
             log.error("Pulse error: %s", e)
@@ -251,6 +305,24 @@ def run_heartbeat():
                     break
             except:
                 pass
+
+
+# ── Config Helpers ──────────────────────────────────────────────────
+def save_config_change(update):
+    """Deep merge update into config and save."""
+    config = load_config()
+    
+    def deep_update(base, upd):
+        for k, v in upd.items():
+            if k in base and isinstance(base[k], dict) and isinstance(v, dict):
+                deep_update(base[k], v)
+            else:
+                base[k] = v
+        return base
+
+    deep_update(config, update)
+    save_json(CONFIG_FILE, config)
+    return config
 
 
 class AgentAPIHandler(SimpleHTTPRequestHandler):
@@ -301,16 +373,27 @@ class AgentAPIHandler(SimpleHTTPRequestHandler):
             config = load_config()
             provider_key = config.get("provider", "ollama")
             provider = config.get("providers", {}).get(provider_key, {})
-            base_url = provider.get("base_url", "http://localhost:11434")
-            api_format = provider.get("api_format", "ollama")
+            base_url = provider.get("base_url", "")
+            
+            # Smart defaults if missing
+            if not base_url:
+                base_url = "http://localhost:11434" if provider_key == "ollama" else "http://localhost:1234/v1"
+            
+            api_format = provider.get("api_format", "")
+            if not api_format:
+                api_format = "ollama" if "11434" in base_url or provider_key == "ollama" else "openai"
+            
             api_key = provider.get("api_key", "")
             models = []
             try:
                 parsed = urlparse(base_url)
+                default_port = 11434 if api_format == "ollama" else 1234
+                
                 if parsed.scheme == "https":
                     conn = http.client.HTTPSConnection(parsed.hostname, parsed.port or 443, timeout=5)
                 else:
-                    conn = http.client.HTTPConnection(parsed.hostname, parsed.port or 11434, timeout=5)
+                    conn = http.client.HTTPConnection(parsed.hostname, parsed.port or default_port, timeout=5)
+                
                 if api_format == "ollama":
                     conn.request("GET", "/api/tags")
                     resp = conn.getresponse()
@@ -318,7 +401,11 @@ class AgentAPIHandler(SimpleHTTPRequestHandler):
                     models = [m["name"] for m in data.get("models", [])]
                 else:
                     headers = {"Authorization": f"Bearer {api_key}"}
-                    conn.request("GET", "/v1/models", headers=headers)
+                    # Handle both http://host:port and http://host:port/v1 formats
+                    request_path = parsed.path.rstrip('/') + "/models" if parsed.path else "/v1/models"
+                    if not request_path.startswith('/'): request_path = '/' + request_path
+                    
+                    conn.request("GET", request_path, headers=headers)
                     resp = conn.getresponse()
                     data = json.loads(resp.read().decode())
                     models = [m["id"] for m in data.get("data", [])]
@@ -394,33 +481,31 @@ class AgentAPIHandler(SimpleHTTPRequestHandler):
             return
 
         if path == "/api/config":
-            config = load_config()
-            config.update(body)
-            save_json(CONFIG_FILE, config)
+            save_config_change(body)
             self._json_response({"ok": True})
             return
 
         if path == "/api/provider":
-            config = load_config()
             new_provider = body.get("provider")
+            config = load_config()
             if new_provider and (new_provider in config.get("providers", {}) or new_provider == "local"):
-                config["provider"] = new_provider
-                # Update model to provider default
+                update = {"provider": new_provider}
                 if new_provider in config.get("providers", {}):
-                    config["model"] = config["providers"][new_provider].get("default_model", config.get("model"))
-                save_json(CONFIG_FILE, config)
+                    default_model = config["providers"][new_provider].get("default_model")
+                    if default_model:
+                        update["model"] = default_model
+                
+                save_config_change(update)
                 self._json_response({"ok": True, "provider": new_provider})
             else:
                 self._json_response({"error": "Unknown provider"}, 400)
             return
 
         if path == "/api/embedding_provider":
-            config = load_config()
             new_provider = body.get("provider")
-            # Allow "local" or any known providers
+            config = load_config()
             if new_provider and (new_provider in config.get("providers", {}) or new_provider == "local"):
-                config["embedding_provider"] = new_provider
-                save_json(CONFIG_FILE, config)
+                save_config_change({"embedding_provider": new_provider})
                 self._json_response({"ok": True, "provider": new_provider})
             else:
                 self._json_response({"error": "Unknown embedding provider"}, 400)
@@ -585,6 +670,16 @@ class AgentAPIHandler(SimpleHTTPRequestHandler):
             files = body.get("files", [])  # [{name, type, content}]
             history = body.get("history", [])  # previous messages
 
+            # RESET AGENT STATUS: If a new chat is sent, the agent is no longer 'done' or 'stopped'
+            state_data = load_json(STATE_FILE, {})
+            goal = str(state_data.get("goal", "")).lower()
+            status = str(state_data.get("status", "")).lower()
+            if "done" in goal or "stopped" in status or "complete" in status:
+                state_data["goal"] = "ready"
+                state_data["status"] = "ready"
+                save_json(STATE_FILE, state_data)
+                log.info("Agent state reset to 'ready' via new chat message.")
+
             # Build content with file attachments
             content_parts = []
             image_payloads = [] # List of {mime, b64}
@@ -632,10 +727,16 @@ class AgentAPIHandler(SimpleHTTPRequestHandler):
             
             # --- JIT MEMORY RECALL (Core Intelligence) ---
             # Search for semantically similar past experiences for the GUI chat
-            past_wisdom = memory.recall(user_msg)
             if past_wisdom:
                 log.info("💡 [Memory/Chat] Injecting past wisdom into GUI context.")
                 sys_prompt += f"\n\n## Past Experience (Wisdom)\nYou have solved a similar problem before. Use this to avoid repeating mistakes:\n---\n{past_wisdom}\n---\n"
+            
+            # --- DYNAMIC INSTRUCTIONS (RAG) ---
+            instructions = memory.recall_instructions(user_msg)
+            if instructions:
+                log.info("📚 [Memory/Chat] Injecting dynamic instructions.")
+                sys_prompt += f"\n\n## Dynamic Instructions\nFollow these specific guidelines for the current task:\n---\n{instructions}\n---\n"
+            # ----------------------------------
             # ---------------------------------------------
 
             # Trim history to a lean buffer (8k chars ~2k tokens)
@@ -742,15 +843,20 @@ class AgentAPIHandler(SimpleHTTPRequestHandler):
             return {}
 
     def _json_response(self, data, code=200):
-        self.send_response(code)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
-        self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
-        self.send_header("Pragma", "no-cache")
-        self.end_headers()
-        self.wfile.write(json.dumps(data).encode())
+        try:
+            self.send_response(code)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type")
+            self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+            self.send_header("Pragma", "no-cache")
+            self.end_headers()
+            self.wfile.write(json.dumps(data).encode())
+        except (ConnectionResetError, BrokenPipeError):
+            log.debug("Client disconnected before JSON response could be sent.")
+        except Exception as e:
+            log.error("Error sending JSON response: %s", e)
 
     def do_OPTIONS(self):
         self.send_response(200)
@@ -881,14 +987,11 @@ def _build_chat_system_prompt(thinking_enabled):
     parts.append(f"## Environment\nOS: Windows\nWorkspace: {BASE_DIR}\nMap: [MAP.md](file:///c:/new-agent-mohannad/MAP.md)")
 
     # Rules & Tools (Streamlined)
+    # Rules & Tools (Streamlined Fallback)
     parts.append(
         "## Rules\n"
         "1. Reason in `[THINK]...[/THINK]`.\n"
         "2. Save files to `output/` via `write_file`.\n"
-        "3. Focus ONLY on current goal + MAP.md.\n"
-        "4. Be brief. 1-2 sentence max reply.\n\n"
-        "## Tools\n"
-        "- `read_file`, `write_file`, `run_command`, `list_dir`, `update_state`, `recall`, `search_web`, `system_stats`"
     )
 
     return "\n\n".join(parts)
@@ -920,7 +1023,7 @@ if __name__ == "__main__":
         heartbeat_thread.start()
         log.info("Heartbeat resumed from persistent state.")
 
-    server = HTTPServer(("127.0.0.1", args.port), AgentAPIHandler)
+    server = ThreadingHTTPServer(("127.0.0.1", args.port), AgentAPIHandler)
     log.info("GUI server running at http://localhost:%d", args.port)
     try:
         server.serve_forever()

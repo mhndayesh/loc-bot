@@ -51,9 +51,8 @@ if os.path.exists(VAULT_FILE):
         if len(vault) > 0:
             for i, entry in enumerate(vault):
                 print(f"Lesson #{i+1}:")
-                print(f"  Problem: {entry.get('problem')}")
-                print(f"  Solution: {entry.get('solution')}")
-                print(f"  Trigger: {entry.get('trigger', 'unknown')}")
+                print(f"  Problem: {entry.get('metadata', {}).get('problem') or entry.get('text', '').split('Solution:')[0].replace('Problem: ', '').strip()}")
+                print(f"  Solution: {entry.get('metadata', {}).get('solution') or entry.get('text', '').split('Solution:')[-1].strip()}")
             print("\n✅ DREAMING SUCCESS: Agent reflected and extracted wisdom!")
         else:
             print("\n❌ DREAMING FAILED: No lessons found in vault.")

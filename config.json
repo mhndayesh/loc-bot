@@ -3,22 +3,20 @@
   "providers": {
     "ollama": {
       "base_url": "http://localhost:11434",
-      "api_format": "ollama",
       "api_key": "ollama",
-      "default_model": "llama3.2:3b"
+      "api_format": "ollama"
     },
     "lmstudio": {
       "base_url": "http://localhost:1234/v1",
-      "api_format": "openai",
-      "api_key": "lm-studio",
-      "default_model": "bullmoose-0.1-llama-3-8b-alpha"
+      "api_key": "",
+      "api_format": "openai"
     }
   },
-  "model": "ibm/granite-4-h-tiny",
-  "temperature": 0.1,
-  "num_ctx": 32768,
-  "max_tokens": 0,
-  "thinking_enabled": true,
+  "model": "deepseek/deepseek-r1-0528-qwen3-8b",
+  "temperature": 0.55,
+  "num_ctx": 16384,
+  "max_tokens": 16384,
+  "thinking_enabled": false,
   "embedding_provider": "lmstudio",
   "embedding_model": "text-embedding-nomic-embed-text-v1.5",
   "heartbeat_interval": 600,

@@ -178,12 +178,10 @@ class AgentEngine:
             ts = time.strftime("%Y-%m-%d %H:%M:%S")
             f.write(f"### {ts}\n- **Action**: {action}\n- **Result**: {result}\n\n")
         
-        # PROACTIVE COMPACTION: If journal > 20KB, move to summary and trigger Dreaming
         try:
             if os.path.exists(JOURNAL_FILE) and os.path.getsize(JOURNAL_FILE) > 20000:
                 log.info("Journal size exceeded 20KB. Triggering compaction and Dreaming.")
-                self._compact_memory()
-                self.reflect(force=True) # Ensure consolidation happens immediately
+                self.reflect(force=True)
         except Exception as e:
             log.warning("Journal auto-compaction/dreaming failed: %s", e)
 
@@ -215,18 +213,36 @@ class AgentEngine:
 
     # ── Parsers (3B-friendly markers) ────────────────────────────────────
     TOOL_RE  = re.compile(r"\[TOOL\]\s*(\w+)\((.*?)\)\s*\[/TOOL\]", re.DOTALL)
-    THINK_RE = re.compile(r"\[THINK\](.*?)\[/THINK\]", re.DOTALL)
+    THINK_RE = re.compile(r"\[THINK\](.*?)\[/THINK\]", re.DOTALL | re.IGNORECASE)
+    NATIVE_THINK_RE = re.compile(r"<think>(.*?)</think>", re.DOTALL | re.IGNORECASE)
 
     def parse_thinking(self, text: str) -> str | None:
-        """Extract the [THINK] block from the LLM response."""
-        m = self.THINK_RE.search(text)
-        if m:
-            return m.group(1).strip()
-        return None
+        """Extract all thinking blocks from the LLM response."""
+        thoughts = []
+        
+        # Capture Mo-style [THINK] blocks
+        for m in self.THINK_RE.finditer(text):
+            thoughts.append(m.group(1).strip())
+            
+        # Capture native <think> blocks (often nested or separate)
+        for m in self.NATIVE_THINK_RE.finditer(text):
+            content = m.group(1).strip()
+            if content not in thoughts: # Avoid exact duplicates if nested
+                thoughts.append(content)
+            
+        if not thoughts:
+            return None
+            
+        # Join multiple thoughts if present, and clean up any remaining internal tags
+        combined = "\n---\n".join(thoughts)
+        combined = self.NATIVE_THINK_RE.sub(r"\1", combined) # Flatten nested native tags
+        return combined.strip()
 
     def strip_thinking(self, text: str) -> str:
-        """Remove [THINK] blocks from the text."""
-        return self.THINK_RE.sub("", text).strip()
+        """Remove all thinking blocks from the text."""
+        text = self.THINK_RE.sub("", text)
+        text = self.NATIVE_THINK_RE.sub("", text)
+        return text.strip()
 
     def save_thinking(self, thinking: str):
         """Persist the agent's reasoning to SCRATCHPAD.md."""
@@ -459,6 +475,24 @@ class AgentEngine:
             except Exception as e:
                 return f"Error: {e}"
 
+        # --- recall ---
+        if name == "recall" and len(args) >= 1:
+            try:
+                query = args[0]
+                res = memory.recall(query)
+                return f"OK: recall result: {res}" if res else "No relevant memory found."
+            except Exception as e:
+                return f"Error: {e}"
+
+        # --- memorize ---
+        if name == "memorize" and len(args) >= 1:
+            try:
+                content = args[0]
+                mem_id = memory.vault.add(content)
+                return f"OK: memorized as {mem_id}" if mem_id else "Error: failed to save memory."
+            except Exception as e:
+                return f"Error: {e}"
+
 
         # --- fallback: custom skill from skills/ ---
         script = os.path.join(SKILLS_DIR, f"{name}.py")
@@ -534,22 +568,23 @@ class AgentEngine:
         except Exception as e:
             return f"Sync failed: {e}"
 
-    def _compact_memory(self) -> str:
-        """Move JOURNAL.md content into SUMMARY.md, then start a fresh journal."""
+    def _compact_memory(self, summary_text: str = "") -> str:
+        """Append summary text to SUMMARY.md and truncate the journal, preserving recent lines."""
         try:
-            if not os.path.exists(JOURNAL_FILE):
-                return "Nothing to compact."
-            with open(JOURNAL_FILE, "r", encoding="utf-8") as f:
-                content = f.read().strip()
-            if not content:
-                return "Journal is empty."
-            # append to SUMMARY
-            with open(SUMMARY_FILE, "a", encoding="utf-8") as f:
-                f.write(f"\n## Compacted {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
-                f.write(content + "\n")
-            # start fresh journal (don't delete — recreate)
-            self._write_file_atomic(JOURNAL_FILE, f"# JOURNAL.md\n\n(compacted at {time.strftime('%H:%M:%S')})\n\n")
-            return "OK: journal compacted into SUMMARY.md"
+            if summary_text:
+                with open(SUMMARY_FILE, "a", encoding="utf-8") as f:
+                    f.write(f"\n## Compacted {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+                    f.write(summary_text + "\n")
+            
+            # Keep the last ~2000 chars of the journal for smooth short-term context
+            if os.path.exists(JOURNAL_FILE):
+                with open(JOURNAL_FILE, "r", encoding="utf-8") as f:
+                    content = f.read()
+                keep = content[-2000:] if len(content) > 2000 else content
+                with open(JOURNAL_FILE, "w", encoding="utf-8") as f:
+                    f.write(f"# JOURNAL.md (truncated)\n...{keep}")
+
+            return "OK: journal compacted."
         except Exception as e:
             return f"Compaction failed: {e}"
 
@@ -571,22 +606,47 @@ class AgentEngine:
         # 3. Vision
         parts.append("## Vision\nYou have native vision. If an image is provided, you see it.")
 
-        # 4. Mandatory Rules & Tools (Ultra-Lean)
+        # 3a. Dynamic Instructions (RAG)
+        # Check current goal or recent plan step for context
+        num_ctx = self.config.get("num_ctx", 2048)
+        max_rag_chars = max(2048, int(num_ctx * 1.5)) # Target ~35% of total context tokens (1 token ~ 4 chars)
+
+        query = self.state.get("goal", "")
+        if self.state.get("plan"):
+             # Add current plan step to query for better context
+             current_step = next((s["step"] for s in self.state["plan"] if s["status"] == "in_progress"), "")
+             if current_step:
+                 query += f" {current_step}"
+        
+        if query:
+            instructions = memory.recall_instructions(query, max_chars=max_rag_chars)
+            if instructions:
+                parts.append(f"## Dynamic Instructions\nFollow these guidelines:\n---\n{instructions}\n---")
+
+        # 4. Mandatory Rules & Tools (Ultra-Lean Fallback)
+        # We only keep the absolute bare minimum to prevent total collapse if DB fails
         parts.append(
             "## Rules\n"
             "1. Reason in `[THINK]...[/THINK]`.\n"
-            "2. Actions MUST use `[TOOL] read_file(\"MAP.md\") [/TOOL]` syntax.\n"
-            "3. Be brief. 1-2 sentence max reply.\n"
-            "4. Refer to MAP.md for identity/skills.\n\n"
-            "## Tools\n"
-            "- `read_file`, `write_file`, `run_command`, `list_dir`, `update_state`, `recall`, `recall`, `search_web`, `system_stats`"
+            "2. Actions MUST use `[TOOL] name(args) [/TOOL]` syntax.\n"
+            "3. Refer to MAP.md for identity.\n"
         )
 
         # 5. Current State
+        plan_str = "(none)"
+        plan = self.state.get("plan", [])
+        if plan:
+            steps = []
+            for i, s in enumerate(plan):
+                status_icon = "✅" if s['status'] == 'done' else "⏳" if s['status'] == 'todo' else "🚀"
+                steps.append(f"{i}. {status_icon} {s['step']}")
+            plan_str = "\n".join(steps)
+
         parts.append(
             f"## Current Focus\n"
             f"- **Goal**: {self.state.get('goal', '(none)')}\n"
-            f"- **Status**: {self.state.get('status', 'ready')}"
+            f"- **Status**: {self.state.get('status', 'ready')}\n"
+            f"- **Mission Plan**:\n{plan_str}"
         )
 
         return "\n\n".join(parts)
@@ -630,9 +690,10 @@ class AgentEngine:
         else:
             # If no user message (autonomous pulse), provide a nudge
             messages.append({"role": "user", "content":
-                f"Your current goal is: {self.state.get('goal','(none)')}. "
-                "Decide the next action and respond with a single [TOOL] call. "
-                "If nothing to do, respond [SILENT_OK]."
+                f"Your current objective is: {self.state.get('goal','(none)')}. "
+                "Check your Mission Plan and take the next necessary action. "
+                "Respond with a [TOOL] call to advance the plan. "
+                "If everything is truly finished, respond [SILENT_OK]."
             })
 
         # ── Ollama native format ───────────────────────────────────────
@@ -725,8 +786,11 @@ class AgentEngine:
 
         # 1. JIT MEMORY RECALL (Core Function)
         # Search for semantically similar past experiences
+        num_ctx = self.config.get("num_ctx", 2048)
+        max_rag_chars = max(2048, int(num_ctx * 1.5))
+
         user_query = self.state.get('goal', '')
-        past_wisdom = memory.recall(user_query)
+        past_wisdom = memory.recall(user_query, max_chars=max_rag_chars)
         if past_wisdom:
             log.info("💡 [Memory] Injecting past wisdom into context.")
             prompt += f"\n\n## Past Experience (Wisdom)\nYou have solved a similar problem before. Use this to avoid repeating mistakes:\n---\n{past_wisdom}\n---\n"
@@ -881,20 +945,25 @@ class AgentEngine:
             self.state["retry_count"] = 0
             self.save_state()
 
-    def reflect(self):
-        """Review recent activity and extract distilled lessons."""
+    def reflect(self, force=False):
+        """Review recent activity, extract distilled lessons, and optionally compact."""
         log.info("Starting memory reflection (Dreaming)...")
         
         last_reflection = self.state.get("last_reflection_ts", 0)
         
-        # 1. Load recent journal context (only if new)
+        # 1. Load recent journal context
         journal = ""
+        full_journal = ""
         if os.path.exists(JOURNAL_FILE):
             try:
                 mtime = os.path.getmtime(JOURNAL_FILE)
-                if mtime > last_reflection:
+                if mtime > last_reflection or force:
                     with open(JOURNAL_FILE, "r", encoding="utf-8") as f:
-                        journal = f.read()[-3000:] # Reduced to 3k for context safety
+                        full_journal = f.read()
+                        # Pass a safe chunk of the journal to the LLM
+                        num_ctx = self.config.get("num_ctx", 2048)
+                        safe_chars = max(4000, int(num_ctx * 2))
+                        journal = full_journal[-safe_chars:]
             except: pass
         
         # 2. Get pulse files modified AFTER last reflection
@@ -904,84 +973,76 @@ class AgentEngine:
             try:
                 files = [os.path.join(MEMORY_DIR, f) for f in os.listdir(MEMORY_DIR) if f.startswith("pulse_")]
                 # Filter by mtime
-                current_new_files = [f for f in files if os.path.getmtime(f) > last_reflection]
+                current_new_files = [f for f in files if os.path.getmtime(f) > last_reflection or force]
                 current_new_files.sort(key=os.path.getmtime)
                 
                 # Limit to latest 5 new pulses
                 new_files = current_new_files[-5:]
                 for f in new_files:
                     try:
-                        # Even smaller snippets for context safety
                         with open(f, "r", encoding="utf-8") as rf:
                             content = rf.read()
                             pulse_logs.append(content[:300]) 
                     except: pass
             except: pass
         
-        if not journal and not pulse_logs:
+        if not journal and not pulse_logs and not force:
             log.info("Nothing new to reflect on since last dreaming. Skipping.")
             return
 
         recent_context = f"## JOURNAL\n{journal}\n\n## NEW PULSES\n" + "\n---\n".join(pulse_logs)
         
         reflect_prompt = f"""You are the Agent's Wisdom Integrator (Sensei mode). 
-Your task is to review recent activity and decide which experiences deserve to be stored in the 'Episodic Memory' for future recall.
+Your task is to review recent activity from the Journal and Pulses.
+You must perform TWO tasks:
+1. Extract "lessons" (key problems solved, system patches).
+2. Generate a dense "summary" of all the major events in the log.
 
-IDENTIFICATION CRITERIA (The "Green Lights"):
+IDENTIFICATION CRITERIA FOR LESSONS:
 1. THE PIVOT: Success after one or more failures/errors.
-2. EXPLICIT PRAISE: User said "good", "perfect", "excellent", "thanks", etc.
-3. HIGH EFFORT: A goal that took many steps or complex tool sequences.
-4. SYSTEM PATCH: Solving a technical/OS error or permission issue.
-5. SELF-JUDGMENT: Any recurring pattern or preference you've noticed that will save time later.
-
-OBJECTIVE:
-Filter out the noise. Do NOT memorize simple directory listings or trivial chat. 
-Only memorize "Wisdom" that will help you solve similar problems faster.
+2. SYSTEM PATCH: Solving a technical/OS error or permission issue.
 
 INPUT LOGS:
 {recent_context}
 
-Output your findings as a JSON list of objects. Each object MUST have:
-- "problem": Short description of the challenge encountered.
-- "solution": Concise, actionable steps that actually worked.
-- "trigger": The reason this was chosen (e.g., "The Pivot").
+Output your findings as a STRICT, VALID JSON object containing TWO keys: "lessons" and "summary".
+- "summary": A very dense, 2-3 sentence paragraph summarizing the events.
+- "lessons": A list of objects. Each object MUST have:
+  - "problem": Short description of the challenge encountered.
+  - "solution": Concise, actionable steps that actually worked.
 
 FORMAT:
-[
-  {{"problem": "...", "solution": "...", "trigger": "..."}}
-]
-If nothing is worth memorizing, return [].
-Respond ONLY with the JSON block.
+{{
+  "summary": "Agent attempted to build X, encountered error Y, and resolved it by doing Z.",
+  "lessons": [
+    {{"problem": "...", "solution": "..."}}
+  ]
+}}
+WARNING: Respond ONLY with the JSON block. Do not include markdown codeblocks. Do not include text after the final closing bracket '}}'. Ensure all quotes inside strings are correctly escaped.
 """
         response = self.call_llm(reflect_prompt)
         
         # Parse JSON
-        lessons = []
-        parse_success = False
+        data = {}
+        
+        # 1. Strip think tags if present
+        clean_response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL).strip()
+        
+        # 2. Extract outermost JSON object
         try:
-            # Better JSON extraction: find first [ and last ]
-            start = response.find('[')
-            end = response.rfind(']')
-            if start != -1 and end != -1 and end > start:
-                json_str = response[start:end+1]
-                try:
-                    lessons = json.loads(json_str)
-                    parse_success = True
-                except:
-                    # Try a simpler match if nested fails
-                    json_match = re.search(r'\[\s*\{.*\}\s*\]', response, re.DOTALL)
-                    if json_match:
-                        lessons = json.loads(json_match.group())
-                        parse_success = True
-            elif response.strip() == "[]":
-                lessons = []
-                parse_success = True
+            start_idx = clean_response.find('{')
+            end_idx = clean_response.rfind('}')
+            
+            if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+                json_str = clean_response[start_idx:end_idx+1]
+                data = json.loads(json_str)
             else:
-                lessons = json.loads(response.strip())
-                parse_success = True
+                data = json.loads(clean_response) # Fallback if no extra text
         except Exception as e:
-            log.warning("Reflection failed to parse JSON: %s. Continuing with cleanup.", e)
-            parse_success = False
+            log.warning("Reflection failed to parse JSON: %s. Output: %s", e, clean_response[:100])
+
+        lessons = data.get("lessons", [])
+        summary = data.get("summary", "")
 
         # Apply lessons if any
         for lesson in lessons:
@@ -991,23 +1052,16 @@ Respond ONLY with the JSON block.
                 log.info("🧠 [Reflection] New lesson learned: %s", prob)
                 memory.memorize(prob, sol)
         
-        # --- HARD CLEANUP: Remove processed logs to prevent re-dreaming ---
-        # We Cleanup AFTER the LLM call regardless of parse success to satisfy 'Hard Logic' 
-        # (avoiding infinite loops on problematic or boring logs)
-        log.info("Hard Cleanup: Deleting %d pulse logs.", len(new_files))
+        # --- HARD CLEANUP: Remove processed logs ---
         for f in new_files:
-            try:
-                os.remove(f)
+            try: os.remove(f)
             except: pass
         
-        # Truncate journal
-        if journal and os.path.exists(JOURNAL_FILE):
-             try:
-                 with open(JOURNAL_FILE, "w", encoding="utf-8") as f:
-                     f.write(f"# Journal truncated after reflection at {time.ctime()}\n")
-             except: pass
-        # -----------------------------------------------------------------
-
+        # Compaction logic
+        if force or len(full_journal) > 20000:
+            log.info("Journal compaction threshold met. Compacting with summary.")
+            self._compact_memory(summary_text=summary)
+        
         # Update last reflection timestamp
         self.state["last_reflection_ts"] = time.time()
         self.save_state()

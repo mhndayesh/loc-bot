@@ -22,7 +22,8 @@ workspace/*
 !workspace/.gitkeep
 output/*
 !output/.gitkeep
-
+knowledge/bge_large_onnx/
+*.tmp_*
 # IDE
 .vscode/
 .idea/
