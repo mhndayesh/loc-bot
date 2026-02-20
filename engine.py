@@ -685,7 +685,7 @@ class AgentEngine:
         return "\n\n".join(parts)
 
     # ── LLM call ───────────────────────────────────────────────────────
-    def call_llm(self, system_prompt: str, user_msg: str = "", images: list = None) -> str:
+    def call_llm(self, system_prompt: str, user_msg: str = "", images: list = None, json_format: bool = False) -> str:
         """
         Call a local LLM.  Reads from config.json first, env vars override.
         Supports Ollama native (/api/chat) and OpenAI-compatible (/v1/chat/completions).
@@ -750,6 +750,9 @@ class AgentEngine:
                     "num_predict": max_tokens if max_tokens > 0 else -1, # Ollama uses -1 for unlimited
                 },
             }
+            if json_format:
+                payload["format"] = "json"
+
             extract = lambda data: data["message"]["content"]
 
         # ── OpenAI-compatible format ───────────────────────────────────
@@ -773,6 +776,9 @@ class AgentEngine:
                 "messages": final_messages,
                 "temperature": temp,
             }
+            if json_format:
+                payload["response_format"] = {"type": "json_object"}
+
             if max_tokens > 0:
                 payload["max_tokens"] = max_tokens
             extract = lambda data: data["choices"][0]["message"]["content"]
@@ -792,6 +798,56 @@ class AgentEngine:
             return extract(data)
         except Exception as e:
             return f"LLM_ERROR: {e}"
+
+    def classify_memory(self, text: str) -> str:
+        """JSON Chain-of-Thought Meta-Tagging to classify FACT vs CHATTER."""
+        prompt = f"""Analyze the provided text. You must output a strictly valid JSON object.
+Step 1: Write a short 'justification' explaining if the text contains a concrete project FACT (password, strict configuration, name, specific instruction to memorize).
+Step 2: If a fact exists, write it in 'extracted_entity'. If not, write 'none'.
+Step 3: Output the final 'category' as exactly FACT or CHATTER.
+
+JSON SCHEMA:
+{{
+  "justification": "string",
+  "extracted_entity": "string",
+  "category": "FACT|CHATTER"
+}}
+
+TEXT:
+"{text}"
+"""
+        try:
+            # Drop temperature to 0.1 for classification via config override simulation
+            old_temp = self.config.get("temperature", 0.6)
+            self.config["temperature"] = 0.1
+            
+            resp = self.call_llm(system_prompt="You are a JSON meta-tagging classification system.", user_msg=prompt, json_format=True)
+            self.config["temperature"] = old_temp
+            
+            if "LLM_ERROR" in resp: return "FACT"
+            
+            try:
+                # Some LLMs wrap json in markdown block even when told not to
+                if "```json" in resp:
+                    resp = resp.split("```json")[1].split("```")[0].strip()
+                elif "```" in resp:
+                    resp = resp.split("```")[1].split("```")[0].strip()
+                    
+                result_json = json.loads(resp)
+                ans = str(result_json.get('category', '')).strip().upper()
+            except:
+                ans = resp.upper()
+
+            # Aggressive keyword fallback
+            text_lower = text.lower()
+            if "memorize" in text_lower or "exact answer" in text_lower or "secret" in text_lower:
+                return "FACT"
+                
+            if "FACT" in ans: return "FACT"
+            return "CHATTER"
+        except Exception as e:
+            log.warning(f"Classification JSON Error: {e}")
+            return "FACT" # Safest default
 
     # ── Main loop / pulse ──────────────────────────────────────────────
     def pulse(self, mode: str = "chat"):
@@ -818,14 +874,17 @@ class AgentEngine:
             return
 
         # 1. JIT MEMORY RECALL (Core Function)
-        # Search for semantically similar past experiences
-        num_ctx = self.config.get("num_ctx", 2048)
-        max_rag_chars = max(2048, int(num_ctx * 1.5))
+        # Search for semantically similar past experiences (Top 10 FACTS)
+        fact_results = memory.recall(user_query, n_results=10, where={"type": "FACT"})
+        past_wisdom = ""
+        if fact_results:
+            if isinstance(fact_results, list):
+                past_wisdom = "\n---\n".join([m["entry"]["text"] for m in fact_results])[:8000]
+            else:
+                past_wisdom = fact_results[:8000]
 
-        user_query = self.state.get('goal', '')
-        past_wisdom = memory.recall(user_query, max_chars=max_rag_chars)
         if past_wisdom:
-            log.info("💡 [Memory] Injecting past wisdom into context.")
+            log.info("💡 [Memory] Injecting past wisdom (FACTS) into context.")
             prompt += f"\n\n## Past Experience (Wisdom)\nYou have solved a similar problem before. Use this to avoid repeating mistakes:\n---\n{past_wisdom}\n---\n"
 
         # LOOP DETECTION CHECK - PRE-FLIGHT

@@ -726,25 +726,39 @@ class AgentAPIHandler(SimpleHTTPRequestHandler):
             sys_prompt = _build_chat_system_prompt(thinking)
             
             # --- JIT MEMORY RECALL (Core Intelligence) ---
-            # Search for semantically similar past experiences for the GUI chat
             num_ctx = config.get("num_ctx", 2048)
-            max_rag_chars = max(2048, int(num_ctx * 1.5))
-            past_wisdom = memory.recall(user_msg, max_chars=max_rag_chars)
+            # Fetch Top 10 Facts
+            fact_results = memory.recall(user_msg, n_results=10, where={"type": "FACT"})
+            past_wisdom = ""
+            if fact_results:
+                if isinstance(fact_results, list):
+                    past_wisdom = "\n---\n".join([m["entry"]["text"] for m in fact_results])[:8000]
+                else:
+                    past_wisdom = fact_results[:8000]
 
             if past_wisdom:
-                log.info("💡 [Memory/Chat] Injecting past wisdom into GUI context.")
-                sys_prompt += f"\n\n## Past Experience (Wisdom)\nYou have solved a similar problem before. Use this to avoid repeating mistakes:\n---\n{past_wisdom}\n---\n"
+                log.info("💡 [Memory/Chat] Injecting %d chars of FACTs into GUI context.", len(past_wisdom))
+                sys_prompt += f"\n\n## Historical Facts (Wisdom)\nYou have solved a similar problem before or recorded these facts. Use this to avoid repeating mistakes. If the answer exists in the data below, you MUST provide it exactly as written:\n---\n{past_wisdom}\n---\n"
             
             # --- DYNAMIC INSTRUCTIONS (RAG) ---
             instructions = memory.recall_instructions(user_msg)
             if instructions:
                 log.info("📚 [Memory/Chat] Injecting dynamic instructions.")
                 sys_prompt += f"\n\n## Dynamic Instructions\nFollow these specific guidelines for the current task:\n---\n{instructions}\n---\n"
-            # ----------------------------------
-            # ---------------------------------------------
 
-            # Trim history to a lean buffer (8k chars ~2k tokens)
-            msgs_to_send = trim_history(history) 
+            # --- DYNAMIC INPUT CHUNKING (Paste Protection) ---
+            if len(user_msg) > 2000:
+                def _pre_embed_chunks(text):
+                    chunk_size = 2000
+                    chunks = [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
+                    for chunk in chunks:
+                        try:
+                            memory.vault.add(chunk, metadata={"type": "FACT"})
+                        except: pass
+                threading.Thread(target=_pre_embed_chunks, args=(user_msg,), daemon=True).start()
+
+            # Trim history to a strict lean buffer (~2k chars) for continuous CHATTER
+            msgs_to_send = trim_history(history, max_chars=2000, max_turns=6) 
             
             messages = [{"role": "system", "content": sys_prompt}]
             for h in msgs_to_send:
@@ -828,6 +842,18 @@ class AgentAPIHandler(SimpleHTTPRequestHandler):
                     # We could append the result to the reply, but often the 
                     # agent's natural text already explains what it's doing.
                     # For now, we'll just allow the side-effects to happen.
+                    
+                # 3. Async Memory Tagging
+                def _save_memory(u_msg, a_reply):
+                    combined_text = f"U: {u_msg}\nAI: {a_reply}"
+                    try:
+                        memory_type = engine.classify_memory(combined_text)
+                        memory.vault.add(combined_text, metadata={"type": memory_type})
+                        log.info("🧠 Saved memory tagged as [%s]", memory_type)
+                    except Exception as tag_err:
+                        log.debug("Memory tagging failed: %s", tag_err)
+                        
+                threading.Thread(target=_save_memory, args=(user_msg, reply), daemon=True).start()
                 # ----------------------------------
 
                 self._json_response({"reply": reply})

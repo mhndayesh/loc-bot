@@ -253,7 +253,7 @@ class VectorVault:
                 self.save()
                 return entry["id"]
 
-    def query(self, query_text, n_results=1):
+    def query(self, query_text, n_results=1, where=None):
         if not self.data: return []
         
         query_vec = maker.encode(query_text)
@@ -272,6 +272,16 @@ class VectorVault:
         
         results = []
         for entry in self.data:
+            # Metadata Filtering
+            if where:
+                match = True
+                for k, v in where.items():
+                    if entry.get("metadata", {}).get(k) != v:
+                        match = False
+                        break
+                if not match:
+                    continue
+
             entry_vec = np.array(entry["vector"])
             e_norm = np.linalg.norm(entry_vec)
             if e_norm == 0: continue
@@ -289,9 +299,9 @@ class VectorVault:
 vault = VectorVault(MEMORY_STORAGE_FILE)
 instruction_vault = VectorVault(os.path.join(BASE_DIR, "instructions.json"))
 
-def recall(query_text, n_results=1, similarity_threshold=0.5, max_chars=None):
+def recall(query_text, n_results=1, similarity_threshold=0.5, max_chars=None, where=None):
     logger.info(f"Recalling for: {query_text[:50]}...")
-    matches = vault.query(query_text, n_results=n_results)
+    matches = vault.query(query_text, n_results=n_results, where=where)
     if not matches: 
         logger.info("No matches found in vault.")
         return None
@@ -305,6 +315,12 @@ def recall(query_text, n_results=1, similarity_threshold=0.5, max_chars=None):
     if max_chars and len(text) > max_chars:
         logger.info(f"Memory truncated from {len(text)} to {max_chars} chars to fit context.")
         text = text[:max_chars] + "... (truncated)"
+    
+    # Return matches instead of just one if n_results > 1
+    if n_results > 1:
+        valid_matches = [m for m in matches if m["score"] >= similarity_threshold]
+        return valid_matches
+        
     return text
 
 def memorize(problem, solution, rating=5):
