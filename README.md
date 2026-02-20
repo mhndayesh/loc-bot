@@ -1,6 +1,7 @@
 # loc-bot 🤖
 **A Self-Evolving, Infinite Context AI Agent System**
 
+loc-bot is a hyper-efficient Python agent inspired by the brilliant concepts behind OpenClaw. Built to push the limits of cost and hardware optimization, it replaces massive, VRAM-heavy context windows with a lightning-fast (10ms) database recall system. This approach grants the AI limitless long-term memory while keeping token usage near zero and making it incredibly cheap to run.
 `loc-bot` is a powerful, autonomous AI agent designed to run strictly locally on your machine. It executes complex tasks, manages its own environment, and leverages a dual-model RAG architecture to achieve infinite short-term memory scaling without blowing out VRAM context limits.
 
 ## 🚀 Quick Start
