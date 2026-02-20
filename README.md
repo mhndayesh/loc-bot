@@ -1,13 +1,14 @@
 # loc-bot 🤖
-**A Self-Evolving, Local-First AI Agent System**
+**A Self-Evolving, Infinite Context AI Agent System**
 
-`loc-bot` is a powerful, autonomous AI agent designed to run locally on your machine. It can execute complex tasks, manage its own environment, and evolve its capabilities over time.
+`loc-bot` is a powerful, autonomous AI agent designed to run strictly locally on your machine. It executes complex tasks, manages its own environment, and leverages a dual-model RAG architecture to achieve infinite short-term memory scaling without blowing out VRAM context limits.
 
 ## 🚀 Quick Start
 
 1.  **Prerequisites**:
     *   Python 3.10+
     *   [Ollama](https://ollama.com/) or [LM Studio](https://lmstudio.ai/) running locally.
+    *   At least one Chat Model (e.g., `deepseek-r1`) and one Text Embedding model (e.g., `nomic-embed-text`) loaded in your provider.
 
 2.  **Installation**:
     ```bash
@@ -25,14 +26,13 @@
 
 ## ✨ Key Features
 
-*   **Blackwell-Ready Embeddings**: Optimized for high-fidelity local RAG using **ONNX DirectML** (RTX 5070 optimized) for zero-latency retrieval.
+*   **Infinite Context Architecture (RAG)**: The agent dynamically chunks, embeds, and stores every chat message, code paste, and thought process in a persistent lightweight `VectorVault`. It dynamically injects exactly what it needs into the context window, effectively providing infinite memory on small local models.
+*   **Semantic Meta-Tagging**: A specialized background engine automatically intercepts raw data and tags it via CoT parsing as a `FACT` or `CHATTER`. The engine explicitly searches for `FACTS` when planning tasks, dramatically increasing retrieval accuracy.
+*   **Zero-Overhead Idling**: DeepSeek reasoning (`<think>`) loops are forcefully cut by API stop-tokens during agent heartbeats to prevent massive compute waste when idle.
 *   **Autonomous Resilience**: Advanced **Semantic Loop Detection** prevents repetitive error cycles by analyzing the semantic similarity of execution failures.
 *   **Task Checkpointing**: Automatically save and restore complex agent states during multi-step missions to `workspace/.checkpoints/`.
 *   **Developer Toolkit**: Native skills for **Git Integration** (`git_commit`), **Static Code Analysis** (`flake8`), and **Process Management** (PID tracking/kill).
-*   **Intelligent Context Sizing**: Dynamically balances JIT memory retrieval against the model's native context window (`num_ctx`) to prevent prompt dilution.
-*   **Dreaming (Self-Optimization)**: Periodically summarizes `JOURNAL.md` into `SUMMARY.md` while refining pulse logic.
-*   **High-Visibility GUI**: Persistent controls for "Stop", "Pulse", and "Dream Now" with real-time status and journal tracking.
-
+*   **High-Visibility GUI**: Modern Light & Dark mode persistent web client with granular provider management (Host/Port configs per LLM) and dynamic Paste Protection configurations.
 
 ## 📚 Documentation
 

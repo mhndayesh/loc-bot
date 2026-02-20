@@ -21,6 +21,8 @@
             </div>
         </div>
         <div class="header-status">
+            <button class="btn btn-small" id="themeToggle" onclick="toggleTheme()" title="Toggle Light/Dark Mode"
+                style="font-size: 14px; padding: 4px 8px;">☀️</button>
             <button class="btn btn-small btn-terminal-toggle" onclick="toggleTerminal()">_> Terminal</button>
             <span id="statusBadge" class="badge badge-ready">● Ready</span>
             <span id="providerBadge" class="badge badge-provider">Ollama</span>
@@ -378,6 +380,23 @@
                         </select>
                         <button class="btn btn-small" onclick="fetchEmbeddingModels()">Fetch Models</button>
                     </div>
+                </div>
+                <div class="setting-item">
+                    <label for="settingEmbTrigger">
+                        Embedding Trigger (Chunk Cap)
+                        <br><small style="color:#888; font-weight:normal;">Check your embedding model's max window and
+                            select base of it or under it to avoid losing data.</small>
+                    </label>
+                    <select id="settingEmbTrigger">
+                        <option value="512">512</option>
+                        <option value="1024">1024 (1k)</option>
+                        <option value="2048" selected>2048 (2k) - Standard</option>
+                        <option value="4096">4096 (4k)</option>
+                        <option value="8192">8192 (8k)</option>
+                        <option value="16384">16384 (16k)</option>
+                        <option value="32768">32768 (32k)</option>
+                        <option value="65536">65536 (64k)</option>
+                    </select>
                 </div>
             </div>
             <div class="settings-actions" style="margin-top:24px; display:flex; gap:12px;">

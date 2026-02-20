@@ -1,6 +1,6 @@
 # User Guide 📘
 
-Welcome to `loc-bot`! This guide helps you interact with and control your AI agent.
+Welcome to `loc-bot`! This guide helps you interact with and control your AI agent entirely locally, featuring an Infinite Context Memory architecture.
 
 ## The GUI
 
@@ -14,22 +14,25 @@ The interface is divided into tabs:
     *   `recovering`: Fixing a previous error.
     *   `done`: Task completed.
 *   **Controls**:
+    *   **Theme Toggle**: Click the ☀️ / 🌙 button in the top right header to instantly swap between the Light and Dark mode UI elements.
     *   **Start/Stop Loop**: Toggle the autonomous heartbeat (default 60s, or 1s when working).
     *   **Pulse Now**: Force the agent to take one step immediately.
 
 ### 2. 💬 Chat
 *   Talk to the agent directly.
-*   **Attachments**: Upload files (images, code) for the agent to analyze.
-*   **Reasoning**: Toggle "Show Thinking" to see the agent's internal monologue.
+*   **Paste Protection**: You can paste thousands of lines of code into the chat. The backend uses the "Embedding Server" to seamlessly chunk, embed, and archive large pastes in the background without freezing the UI or blowing out the context window.
+*   **Reasoning**: Toggle "Show Thinking" to see the agent's internal monologue (useful for DeepSeek `r1` models).
 
 ### 3. 📝 Activity
 *   **Journal**: A log of the agent's recent actions and results.
 *   **Scratchpad**: The agent's short-term memory and plans.
 
 ### 4. ⚙️ Settings
-*   **Provider**: Choose between Ollama (default) or LM Studio.
-*   **Model**: Select your local LLM model (e.g., `llama3.2`, `deepseek-r1`).
-*   **Context Window**: Adjust token limits (up to 1M tokens supported).
+*   **Provider**: Choose between Ollama (default), LM Studio, Copilot, or Custom API providers.
+*   **URL**: Input specific host/port addresses (e.g., `http://localhost:1234/v1` for LM Studio).
+*   **Chat Model**: Select your active reasoning model (e.g., `deepseek-r1-0528-qwen3-8b`).
+*   **Embedding Model**: Select the dedicated model used to encode your long-term memories (e.g., `nomic-embed-text`).
+*   **Embedding Trigger (Chunk Cap)**: Controls Paste Protection. If you paste a message longer than this setting (default 4000 chars), it will automatically be split into semantic chunks and embedded asynchronously in the background. Maximize this if your embedding model handles huge context sizes.
 *   **Auto-Save**: Settings save automatically when changed.
 
 ## Guiding the Agent
@@ -48,9 +51,8 @@ Watch the **Activity** tab. You'll see the agent:
 
 ## Capabilities
 
-### File Operations
-The agent can read, write, and edit files in its workspace.
-*   *Note*: It cannot overwrite `SOUL.md` or `RULES.md` (Self-Protection).
+### Infinite Context (RAW RAG)
+You do not need to worry about the agent "forgetting" what happened yesterday. Every chat message is transparently converted into lightweight JSON Embeddings in `memory_vault.json` and automatically injected dynamically when relevant.
 
 ### Environment Management 🌍
 The agent can create isolated playgrounds for code:
@@ -59,7 +61,7 @@ The agent can create isolated playgrounds for code:
 *   "Run this script in `data_analysis`."
 
 ### Self-Correction
-If the agent encounters an error (e.g., file not found, syntax error), it enters `recovering` mode. It will analyze the error and try a different approach automatically.
+If the agent encounters an error (e.g., file not found, syntax error), it enters `recovering` mode. The Semantic Loop detection prevents it from making the same exact semantic mistake three times.
 
 ## Troubleshooting
 

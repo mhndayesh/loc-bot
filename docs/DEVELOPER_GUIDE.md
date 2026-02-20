@@ -1,75 +1,58 @@
 # Developer Guide 🛠️
 
-This guide explains the architecture of `loc-bot` and how to extend it.
+This guide explains the architecture of `loc-bot` and how to extend it, deeply focusing on the Infinite Context Memory integrations.
 
 ## Architecture Overview
 
-The system consists of two main components:
+The system consists of three main intelligent components:
 
 1.  **Server (`server.py`)**:
     *   A lightweight HTTP server (Python `http.server`).
-    *   Serves the GUI (`gui/`).
-    *   Exposes a REST API (`/api/...`).
-    *   Manages the "Heartbeat" background thread.
+    *   Serves the GUI (`gui/`) and exposes a REST API (`/api/...`).
+    *   **Asynchronous Embedding Engine**: To prevent Chat Input freezing when users paste 10,000+ characters, `server.py` implements "Paste Protection". It spins off a background Thread that chunks the massive paste according to `config.json` limit (`embedding_trigger`) and pipelines them into the `VectorVault`.
 
 2.  **Engine (`engine.py`)**:
-    *   The brain of the agent.
-    *   Executed via `subprocess` by the server for isolation.
-    *   **Cycle**:
-        1.  **Load State**: Reads `state.json` and identity files.
-        2.  **Prompt**: Assembles context from `SOUL.md`, `MAP.md`, logs, etc.
-        3.  **LLM Call**: Sends prompt to Ollama/LM Studio.
-        4.  **Parse**: Extracts `[THINK]` and `[TOOL]` blocks.
-        5.  **Execute**: Runs the tool (native or custom).
-        6.  **Save**: Persists state and journal.
+    *   The brain of the agent, executed via `subprocess` by the server for isolation.
+    *   **Semantic RAG Builder**: Before building the LLM context, `engine.pulse()` asks the memory module to extract the top `FACTS` semantically relevant to the current `goal`.
+    *   **Idle Optimization**: During `/api/heartbeat` sweeps, if there is no goal, `engine.py` dynamically enforces `temporarily_disable_thinking` and injects `stop: ["."]` into the LM payload to completely annihilate deep-thinking hallucination loops when idle, optimizing VRAM/CPU.
+
+3.  **Memory (`memory.py`)**:
+    *   Houses the `VectorVault` class, a custom JSON-backed hierarchical database storing semantic embeddings (`memory_vault.json`).
+    *   Leverages the LLM inference endpoints asynchronously (simulating Chain-of-Thought json classification) to tag incoming chat and observations strictly as either a `FACT` or `CHATTER`.
 
 ## File Structure
 
 ```
 loc-bot/
-├── engine.py           # Core logic (Pulse, Tools)
-├── server.py           # Web server & API
-├── config.json         # Settings
+├── engine.py           # Core logic (Pulse, Tools, RAG Assembly)
+├── server.py           # Web server, Config API, Threaded Embedder
+├── memory.py           # VectorVault & Semantic Meta-Classification
+├── config.json         # Settings (Theme, embedding limits, routes)
 ├── state.json          # Current goal, status
 ├── SOUL.md             # Agent identity (Protected)
 ├── AGENT_MANUAL.md     # Agent instructions
 ├── skills/             # Custom tool scripts (.py)
-├── memory/             # Chat logs and pulse history
 ├── gui/                # HTML/JS frontend
 └── docs/               # Documentation
 ```
 
 ## Extending the Agent
 
-### Adding a New Tool (Skill)
-You can add tools effectively in two ways:
-
-**1. Native Tool (in `engine.py`)**:
-Add a new `if name == "my_tool":` block in `AgentEngine.run_tool`.
-*   *Pros*: Fast, access to agent internals (`self`).
-*   *Cons*: Requires restarting the agent.
-
-**2. Custom Skill (in `skills/`)**:
-Create a Python script in `skills/my_skill.py`.
+### Adding a New Custom Skill (in `skills/`)
+Create a Python script in `skills/my_skill.py`. The agent auto-detects `skills/*.py` and reads their docstrings to teach itself how to use them.
 ```python
-# skills/my_skill.py
+"""my_skill: Demonstrates how to create a custom ability."""
 import sys
 args = sys.argv[1:]
 print(f"Hello from skill! Args: {args}")
 ```
 The agent can call it via `my_skill("arg1")`.
 *   *Pros*: Modular, dynamic (agent can create these itself!).
-*   *Cons*: Runs in subprocess, no access to `AgentEngine` instance.
+*   *Cons*: Runs in subprocess, no access to `AgentEngine` instance directly.
 
-## safeguards 🛡️
+## Safeguards 🛡️
 
-The `engine.py` includes critical safeguards:
+The system includes critical runtime safeguards:
 *   **Identity Lock**: `write_file` throws an error if target is `SOUL.md` or `RULES.md`.
 *   **Path Traversal Prevention**: `_safe_path` ensures file operations stay within the agent root.
-*   **Token Limits**: Journal/Scratchpad are truncated to prevent prompt explosion.
-
-## Contributing
-
-1.  Fork the repo.
-2.  Create a feature branch.
-3.  Submit a Pull Request.
+*   **Semantic Loop Prevention**: Advanced CoS similarities dynamically detect loop hallucination and aggressively reset the context to break recursive failure states.

@@ -2,8 +2,33 @@
 let currentConfig = {};
 let heartbeatRunning = false;
 
+// Theme Initialization (Early)
+const savedTheme = localStorage.getItem('theme') || 'dark';
+if (savedTheme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+
+function toggleTheme() {
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+    if (isLight) {
+        document.documentElement.removeAttribute('data-theme');
+        localStorage.setItem('theme', 'dark');
+        const btn = document.getElementById('themeToggle');
+        if (btn) btn.textContent = '☀️';
+    } else {
+        document.documentElement.setAttribute('data-theme', 'light');
+        localStorage.setItem('theme', 'light');
+        const btn = document.getElementById('themeToggle');
+        if (btn) btn.textContent = '🌙';
+    }
+}
+
+
 // ── Init ──────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
+    const themeToggleBtn = document.getElementById('themeToggle');
+    if (themeToggleBtn) {
+        themeToggleBtn.textContent = savedTheme === 'light' ? '🌙' : '☀️';
+    }
+
     initTabs();
     initSettings();
     initScrollObserver();
@@ -219,6 +244,8 @@ function populateSettings(config) {
         embModelSelect.insertBefore(opt, embModelSelect.firstChild);
     }
     embModelSelect.value = currentEmbModel;
+
+    document.getElementById('settingEmbTrigger').value = config.embedding_trigger || 2048;
 
     document.getElementById('settingTemp').value = config.temperature || 0.1;
     document.getElementById('tempValue').textContent = config.temperature || 0.1;
@@ -487,6 +514,7 @@ async function saveSettings() {
         model: document.getElementById('settingModel').value,
         embedding_provider: document.querySelector('.provider-toggle.small-toggle .provider-btn.active')?.id.replace('btnEmb', '').toLowerCase() || 'local',
         embedding_model: document.getElementById('settingEmbModel').value,
+        embedding_trigger: parseInt(document.getElementById('settingEmbTrigger').value) || 2048,
         temperature: parseFloat(document.getElementById('settingTemp').value),
         num_ctx: parseInt(document.getElementById('settingCtx').value),
         heartbeat_interval: parseInt(document.getElementById('settingInterval').value),

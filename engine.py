@@ -618,9 +618,19 @@ class AgentEngine:
         except Exception as e:
             return f"Compaction failed: {e}"
 
+    def _read_file_safe(self, path: str, default: str = "") -> str:
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return f.read()
+        except Exception:
+            return default
+
     # ── Prompt assembly ────────────────────────────────────────────────
-    def get_full_prompt(self, mode: str = "chat") -> str:
-        """Assemble an ultra-lean system prompt that refers to MAP.md."""
+    def get_full_prompt(self, mode: str = "chat", max_rags: int = 2000) -> str:
+        """
+        Builds the complete prompt sequence mapping out the agent's universe.
+        Includes Phase 3 enhancements: SKILLS iteration & explicit system directives.
+        """
         parts = []
 
         # 1. Identity & Hub Reference
@@ -675,13 +685,6 @@ class AgentEngine:
                 steps.append(f"{i}. {status_icon} {s['step']}")
             plan_str = "\n".join(steps)
 
-        parts.append(
-            f"## Current Focus\n"
-            f"- **Goal**: {self.state.get('goal', '(none)')}\n"
-            f"- **Status**: {self.state.get('status', 'ready')}\n"
-            f"- **Mission Plan**:\n{plan_str}"
-        )
-
         return "\n\n".join(parts)
 
     # ── LLM call ───────────────────────────────────────────────────────
@@ -718,8 +721,25 @@ class AgentEngine:
 
         # ── build messages ─────────────────────────────────────────────
         messages = [{"role": "system", "content": system_prompt}]
+        
+        goal = self.state.get("goal", "").strip().lower()
+        mode_override = ""
+        # 6. HEARTBEAT SILENCE ENFORCEMENT
+        # If the agent has nothing to do, force a 1-character reply as the FINAL instruction
+        is_idle_heartbeat = (not user_msg and (goal == "" or goal == "done" or goal == "(none)"))
+        
+        if is_idle_heartbeat:
+            mode_override = (
+                "\n\n## CRITICAL SYSTEM OVERRIDE\n"
+                "You are currently IDLING in a background heartbeat. There are no active goals.\n"
+                "DO NOT THINK. DO NOT USE TOOLS. DO NOT CHAT.\n"
+                "You MUST output exactly ONE CHARACTER: `.` and absolutely nothing else."
+            )
+
         if user_msg:
             messages.append({"role": "user", "content": user_msg})
+        elif is_idle_heartbeat:
+            messages.append({"role": "user", "content": f"STATUS: IDLE.{mode_override}"})
         else:
             # If no user message (autonomous pulse), provide a nudge
             messages.append({"role": "user", "content":
@@ -750,6 +770,9 @@ class AgentEngine:
                     "num_predict": max_tokens if max_tokens > 0 else -1, # Ollama uses -1 for unlimited
                 },
             }
+            if is_idle_heartbeat:
+                payload["options"]["stop"] = [".", "[SILENT_OK]"]
+                
             if json_format:
                 payload["format"] = "json"
 
@@ -776,6 +799,9 @@ class AgentEngine:
                 "messages": final_messages,
                 "temperature": temp,
             }
+            if is_idle_heartbeat:
+                payload["stop"] = [".", "[SILENT_OK]"]
+                
             if json_format:
                 payload["response_format"] = {"type": "json_object"}
 
@@ -858,6 +884,12 @@ TEXT:
         log.info("PULSE (%s) ▶ goal=%s  status=%s", mode, self.state.get("goal"), self.state.get("status"))
         
         # Use mode-specific prompt
+        goal = self.state.get("goal", "").strip().lower()
+        is_idle_heartbeat = (mode == "heartbeat" and (goal == "" or goal == "done" or goal == "(none)"))
+        
+        # Disable thinking chains if we are just idling to save massive compute
+        temporarily_disable_thinking = is_idle_heartbeat
+        
         prompt = self.get_full_prompt(mode=mode)
 
         if mode == "reflect":
@@ -874,8 +906,7 @@ TEXT:
             return
 
         # 1. JIT MEMORY RECALL (Core Function)
-        # Search for semantically similar past experiences (Top 10 FACTS)
-        fact_results = memory.recall(user_query, n_results=10, where={"type": "FACT"})
+        fact_results = memory.recall(user_goal, n_results=10, where={"type": "FACT"})
         past_wisdom = ""
         if fact_results:
             if isinstance(fact_results, list):
@@ -922,13 +953,18 @@ TEXT:
                     return
 
         # 1. Ask the LLM
+        # Override the thinking tags if system is idling
+        if temporarily_disable_thinking:
+            prompt = prompt.replace("1. Reason in `[THINK]...[/THINK]`.", "")
+        
         response = self.call_llm(prompt)
         log.info("LLM responded (%d chars)", len(response))
 
         # Check for Silent Reply (ONLY in non-chat modes)
-        if mode != "chat" and ("[SILENT_OK]" in response or "HEARTBEAT_OK" in response):
-            log.info("SILENT REPLY detected (mode=%s).", mode)
-            return
+        if mode != "chat":
+            if "[SILENT_OK]" in response or "HEARTBEAT_OK" in response or response.strip() == ".":
+                log.info("SILENT REPLY detected (mode=%s).", mode)
+                return
 
         # 2. Save raw response to memory/
         mem_file = os.path.join(MEMORY_DIR, f"pulse_{int(time.time())}.txt")

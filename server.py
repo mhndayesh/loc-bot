@@ -747,15 +747,16 @@ class AgentAPIHandler(SimpleHTTPRequestHandler):
                 sys_prompt += f"\n\n## Dynamic Instructions\nFollow these specific guidelines for the current task:\n---\n{instructions}\n---\n"
 
             # --- DYNAMIC INPUT CHUNKING (Paste Protection) ---
-            if len(user_msg) > 2000:
+            chunk_cap = int(config.get("embedding_trigger", 2048))
+            if len(user_msg) > chunk_cap:
                 def _pre_embed_chunks(text):
-                    chunk_size = 2000
-                    chunks = [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
+                    chunks = [text[i:i+chunk_cap] for i in range(0, len(text), chunk_cap)]
                     for chunk in chunks:
                         try:
                             memory.vault.add(chunk, metadata={"type": "FACT"})
                         except: pass
                 threading.Thread(target=_pre_embed_chunks, args=(user_msg,), daemon=True).start()
+
 
             # Trim history to a strict lean buffer (~2k chars) for continuous CHATTER
             msgs_to_send = trim_history(history, max_chars=2000, max_turns=6) 
