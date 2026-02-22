@@ -133,13 +133,16 @@ class MemoryMaker:
         api_format = p_cfg.get("api_format", "openai")
         api_key = p_cfg.get("api_key", "")
         model = self.model_name
+        
+        # Guard against massive token overflow warnings (1 token ~ 4 chars)
+        safe_text = text[:8000]
 
         for attempt in range(3):
             try:
                 if api_format == "ollama":
                     resp = requests.post(f"{url}/api/embeddings", json={
                         "model": model,
-                        "prompt": text
+                        "prompt": safe_text
                     }, timeout=15)
                     return resp.json().get("embedding")
                 else: # OpenAI format
@@ -149,7 +152,7 @@ class MemoryMaker:
                     
                     resp = requests.post(endpoint, headers=headers, json={
                         "model": model,
-                        "input": text
+                        "input": safe_text
                     }, timeout=15)
                     
                     data = resp.json().get("data", [])

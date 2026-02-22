@@ -793,7 +793,10 @@ class AgentEngine:
                         })
                     final_messages.append({"role": "user", "content": content_list})
                 else:
-                    final_messages.append(m)
+                    new_m = m.copy()
+                    if "content" in new_m and not isinstance(new_m["content"], str):
+                        new_m["content"] = str(new_m["content"])
+                    final_messages.append(new_m)
 
             endpoint = "/v1/chat/completions"
             payload = {

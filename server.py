@@ -822,6 +822,12 @@ class AgentAPIHandler(SimpleHTTPRequestHandler):
                         else:
                             # Strip helper keys
                             new_m = {k: v for k, v in m.items() if k not in ["images", "_image_payloads"]}
+                            
+                            # CRITICAL: OpenAI does not tolerate Python Objects (Lists of dicts) in the content array outside Vision formatting.
+                            # Cast Tool output dictionaries/lists forcefully to strings.
+                            if "content" in new_m and not isinstance(new_m["content"], str):
+                                new_m["content"] = str(new_m["content"])
+                                
                             final_messages.append(new_m)
                             
                     endpoint = "/v1/chat/completions"
