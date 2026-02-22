@@ -1,7 +1,9 @@
 # loc-bot 🤖
 **A Self-Evolving, Infinite Context AI Agent System**
 
-`loc-bot` is a powerful, autonomous AI agent designed to run strictly locally on your machine. It executes complex tasks, manages its own environment, and leverages a breakthrough memory architecture to achieve **Infinite Context Scaling** without blowing out the VRAM limits of consumer-grade graphics cards.
+`loc-bot` is a powerful, autonomous AI agent designed to run strictly locally on your machine. It executes complex tasks, manages its own environment, and leverages a breakthrough memory architecture to achieve **Infinite Context Scaling** without blowing out the VRAM limits of consumer-grade graphics cards. 
+
+Built to push the limits of cost and hardware optimization, it replaces massive, VRAM-heavy context windows with a lightning-fast database recall system. This approach grants the AI limitless long-term memory while keeping token usage near zero and making it incredibly cheap to run.
 
 > **Built On Groundbreaking Tech**: The extremely long context window technique utilized by this agent is inspired by and built upon [**mhndayesh/infinite-context-rag**](https://github.com/mhndayesh/infinite-context-rag). 
 
@@ -10,7 +12,6 @@ Running models locally on consumer hardware usually means sacrificing context si
 - **Massive Document Ingestion**: You can paste 100-page PDFs or 10,000 lines of code into the chat. `loc-bot` will asynchronously embed it in the background without freezing your PC.
 - **Continuous Session Tracking**: Your long debugging sessions are tracked as continuous blocks of time. When the agent needs to recall a fact from 50 messages ago, it doesn't just pull an isolated sentence—it exhumes a massive 6,000+ character continuous window centered exactly around the relevant thought. 
 - **Agentic Routing**: The local AI acts as its own search engine, dynamically expanding your queries into dense keywords and mathematically voting on the best memories to retrieve.
-
 ## 🚀 Quick Start
 
 1.  **Prerequisites**:
