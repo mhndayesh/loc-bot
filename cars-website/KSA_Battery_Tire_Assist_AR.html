@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>دراسة جدوى شاملة: مساعد الطريق</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap');
+        body { font-family: 'Cairo', sans-serif; background-color: #f8fafc; color: #1e293b; }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 350px;
+            max-height: 400px;
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+    </style>
+</head>
+<body class="bg-slate-50">
+
+    <nav class="bg-white border-b border-slate-200 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <span class="text-2xl font-bold text-teal-800">مساعد الطريق<span class="text-slate-500 font-light"> | الحاسبة الاحترافية</span></span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+            <div class="card p-6 lg:col-span-1 h-full flex flex-col justify-center">
+                <h2 class="text-xl font-bold text-slate-900 mb-4 border-r-4 border-teal-600 pr-3">توزيع الطلبات</h2>
+                <div class="chart-container">
+                    <canvas id="breakdownChart"></canvas>
+                </div>
+                <p class="text-xs text-slate-500 text-center mt-4">يتغير هذا التوزيع بناءً على نسبة طلبات السطحة والوقود المحددة أدناه.</p>
+            </div>
+
+            <div class="card p-6 bg-slate-900 text-white lg:col-span-2 shadow-xl">
+                <h2 class="text-2xl font-bold text-white mb-6 border-r-4 border-teal-500 pr-3">حاسبة صافي الربح (Net Profit)</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    
+                    <div class="space-y-6">
+                        <div class="bg-slate-800 p-4 rounded-lg space-y-4">
+                            <h3 class="text-teal-400 font-bold border-b border-slate-700 pb-2">الاشتراكات</h3>
+                            <div>
+                                <label class="flex justify-between text-sm text-slate-300 mb-2">المشتركون المستهدفون <span id="subscribersDisplay" class="font-bold text-white">3,000</span></label>
+                                <input type="range" min="100" max="10000" step="100" value="3000" id="subscribersInput" class="w-full h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer rtl:rotate-180">
+                            </div>
+                            <div>
+                                <label class="flex justify-between text-sm text-slate-300 mb-2">سعر الباقة (ريال) <span id="priceDisplay" class="font-bold text-white">460</span></label>
+                                <input type="range" min="150" max="800" step="10" value="460" id="priceInput" class="w-full h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer rtl:rotate-180">
+                            </div>
+                            <div>
+                                <label class="flex justify-between text-sm text-slate-300 mb-2">معدل استخدام الخدمة (%) <span id="usageDisplay" class="font-bold text-white">20%</span></label>
+                                <input type="range" min="5" max="50" step="1" value="20" id="usageInput" class="w-full h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer rtl:rotate-180">
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-800 p-4 rounded-lg space-y-4">
+                            <h3 class="text-amber-400 font-bold border-b border-slate-700 pb-2">التكاليف التشغيلية</h3>
+                            <div>
+                                <label class="flex justify-between text-sm text-red-300 mb-2">مصاريف التشغيل السنوية الثابتة (ريال) <span id="opCostDisplay" class="font-bold text-red-400">200,000</span></label>
+                                <input type="range" min="50000" max="1500000" step="10000" value="200000" id="opCostInput" class="w-full h-2 bg-red-900 rounded-lg appearance-none cursor-pointer rtl:rotate-180">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-6">
+                        <div class="bg-slate-800 p-4 rounded-lg space-y-4">
+                            <h3 class="text-emerald-400 font-bold border-b border-slate-700 pb-2">هوامش أرباح القطع</h3>
+                            <div>
+                                <label class="flex justify-between text-sm text-slate-300 mb-2">ربح بيع البطارية (ريال) <span id="batMarginDisplay" class="font-bold text-emerald-400">100</span></label>
+                                <input type="range" min="20" max="300" step="10" value="100" id="batMarginInput" class="w-full h-2 bg-emerald-700 rounded-lg appearance-none cursor-pointer rtl:rotate-180">
+                            </div>
+                            <div>
+                                <label class="flex justify-between text-sm text-slate-300 mb-2">ربح خدمة/بيع الإطار (ريال) <span id="tireMarginDisplay" class="font-bold text-emerald-400">80</span></label>
+                                <input type="range" min="20" max="250" step="10" value="80" id="tireMarginInput" class="w-full h-2 bg-emerald-700 rounded-lg appearance-none cursor-pointer rtl:rotate-180">
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-800 p-4 rounded-lg space-y-4">
+                            <h3 class="text-red-400 font-bold border-b border-slate-700 pb-2">خسائر التوصيل والسحب</h3>
+                            <div>
+                                <label class="flex justify-between text-sm text-blue-300 mb-2">نسبة طلبات الوقود <span class="text-xs text-slate-500">(تكلفة 20 ريال للطلب)</span> <span id="gasRateDisplay" class="font-bold text-blue-400">5%</span></label>
+                                <input type="range" min="1" max="30" step="1" value="5" id="gasRateInput" class="w-full h-2 bg-blue-700 rounded-lg appearance-none cursor-pointer rtl:rotate-180">
+                            </div>
+                            <div>
+                                <label class="flex justify-between text-sm text-slate-300 mb-2">النسبة الأساسية للسطحة <span id="towRateDisplay" class="font-bold text-white">15%</span></label>
+                                <input type="range" min="5" max="50" step="1" value="15" id="towRateInput" class="w-full h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer rtl:rotate-180">
+                            </div>
+                            <div>
+                                <label class="flex justify-between text-sm text-red-300 mb-2">تكلفة السطحة الواحدة عليك (ريال) <span id="towCostDisplay" class="font-bold text-red-400">150</span></label>
+                                <input type="range" min="50" max="300" step="10" value="150" id="towCostInput" class="w-full h-2 bg-red-900 rounded-lg appearance-none cursor-pointer rtl:rotate-180">
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Final Results -->
+                <div class="mt-8 grid grid-cols-2 lg:grid-cols-5 gap-4 bg-slate-950 p-4 rounded-xl border border-slate-800">
+                    <div class="text-center">
+                        <div class="text-slate-400 text-[10px] mb-1">الاشتراكات</div>
+                        <div class="text-lg font-bold text-white" id="subRevOutput">0</div>
+                    </div>
+                    <div class="text-center border-r border-slate-800">
+                        <div class="text-slate-400 text-[10px] mb-1">بطاريات (<span id="batCountOutput">0</span>)</div>
+                        <div class="text-lg font-bold text-emerald-400" id="batProfitOutput">+0</div>
+                    </div>
+                    <div class="text-center border-r border-slate-800">
+                        <div class="text-slate-400 text-[10px] mb-1">إطارات (<span id="tireCountOutput">0</span>)</div>
+                        <div class="text-lg font-bold text-emerald-400" id="tireProfitOutput">+0</div>
+                    </div>
+                    <div class="text-center border-r border-slate-800">
+                        <div class="text-slate-400 text-[10px] mb-1">وقود (<span id="gasCountOutput">0</span>)</div>
+                        <div class="text-lg font-bold text-blue-400" id="gasCostOutput">-0</div>
+                    </div>
+                    <div class="text-center border-r border-slate-800">
+                        <div class="text-slate-400 text-[10px] mb-1">سطحات (<span id="towCountOutput">0</span>)</div>
+                        <div class="text-lg font-bold text-red-400" id="towingCostOutput">-0</div>
+                    </div>
+                </div>
+
+                <div class="mt-4 flex flex-col md:flex-row justify-between items-center bg-teal-900 p-6 rounded-xl border border-teal-700 shadow-lg">
+                    <div class="mb-4 md:mb-0">
+                        <div class="text-teal-200 text-lg uppercase tracking-wider font-bold">صافي الربح السنوي</div>
+                        <div class="text-xs text-teal-400 mt-1">بعد خصم التكاليف التشغيلية (<span id="opCostOutputDisplay">0</span> ريال) والوقود والسطحات</div>
+                    </div>
+                    <div class="text-4xl sm:text-5xl font-extrabold text-white drop-shadow-md" id="totalNetOutput">0 ريال</div>
+                </div>
+
+            </div>
+        </section>
+        
+    </main>
+
+    <script>
+        Chart.defaults.font.family = "'Cairo', sans-serif";
+        
+        const ctxBreakdown = document.getElementById('breakdownChart').getContext('2d');
+        const breakdownChart = new Chart(ctxBreakdown, {
+            type: 'doughnut',
+            data: {
+                labels: ['بطاريات', 'إطارات', 'سطحة', 'وقود'],
+                datasets: [{
+                    data: [0, 0, 0, 0], // Injected dynamically
+                    backgroundColor: ['#f59e0b', '#0f766e', '#ef4444', '#3b82f6'],
+                    borderWidth: 0,
+                    hoverOffset: 10
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom', rtl: true },
+                    tooltip: { rtl: true }
+                }
+            }
+        });
+
+        const inputs = {
+            subs: document.getElementById('subscribersInput'),
+            price: document.getElementById('priceInput'),
+            usage: document.getElementById('usageInput'),
+            gasRate: document.getElementById('gasRateInput'),
+            towRate: document.getElementById('towRateInput'),
+            towCost: document.getElementById('towCostInput'),
+            batMargin: document.getElementById('batMarginInput'),
+            tireMargin: document.getElementById('tireMarginInput'),
+            opCost: document.getElementById('opCostInput')
+        };
+
+        const outputs = {
+            subRev: document.getElementById('subRevOutput'),
+            batProfit: document.getElementById('batProfitOutput'),
+            tireProfit: document.getElementById('tireProfitOutput'),
+            gasCost: document.getElementById('gasCostOutput'),
+            towCost: document.getElementById('towingCostOutput'),
+            batCount: document.getElementById('batCountOutput'),
+            tireCount: document.getElementById('tireCountOutput'),
+            gasCount: document.getElementById('gasCountOutput'),
+            towCount: document.getElementById('towCountOutput'),
+            totalNet: document.getElementById('totalNetOutput'),
+            opCostDisplayVal: document.getElementById('opCostOutputDisplay')
+        };
+
+        function formatVal(val) { return val.toLocaleString(); }
+
+        function updateCalculator() {
+            const v = {
+                subs: parseInt(inputs.subs.value),
+                price: parseInt(inputs.price.value),
+                usage: parseInt(inputs.usage.value) / 100,
+                gasRate: parseInt(inputs.gasRate.value) / 100,
+                baseTowRate: parseInt(inputs.towRate.value) / 100,
+                towCost: parseInt(inputs.towCost.value),
+                batMargin: parseInt(inputs.batMargin.value),
+                tireMargin: parseInt(inputs.tireMargin.value),
+                opCost: parseInt(inputs.opCost.value)
+            };
+
+            // Display values
+            document.getElementById('subscribersDisplay').innerText = formatVal(v.subs);
+            document.getElementById('priceDisplay').innerText = formatVal(v.price);
+            document.getElementById('usageDisplay').innerText = (v.usage * 100) + '%';
+            document.getElementById('gasRateDisplay').innerText = (v.gasRate * 100) + '%';
+            document.getElementById('towRateDisplay').innerText = (v.baseTowRate * 100) + '%';
+            document.getElementById('towCostDisplay').innerText = v.towCost;
+            document.getElementById('batMarginDisplay').innerText = v.batMargin;
+            document.getElementById('tireMarginDisplay').innerText = v.tireMargin;
+            document.getElementById('opCostDisplay').innerText = formatVal(v.opCost);
+            outputs.opCostDisplayVal.innerText = formatVal(v.opCost);
+
+            // Core Math
+            const subRevenue = v.subs * v.price;
+            const totalRequests = Math.round(v.subs * v.usage);
+            
+            // Adjust proportions proportionally keeping internal ratio fixed
+            const nonGasMultiplier = 1 - v.gasRate;
+            
+            const gasReqs = Math.round(totalRequests * v.gasRate);
+            const towReqs = Math.round(totalRequests * v.baseTowRate * nonGasMultiplier);
+            const batReqs = Math.round(totalRequests * (1 - v.baseTowRate) * 0.60 * nonGasMultiplier);
+            const tireReqs = totalRequests - gasReqs - towReqs - batReqs; // Balance remaining
+            
+            const gasCost = gasReqs * 20;
+            const batProfit = batReqs * v.batMargin;
+            const tireProfit = tireReqs * v.tireMargin;
+            const towingCost = towReqs * v.towCost;
+            
+            const netProfit = subRevenue + batProfit + tireProfit - gasCost - towingCost - v.opCost;
+
+            // Chart Update
+            breakdownChart.data.datasets[0].data = [
+                totalRequests > 0 ? (batReqs/totalRequests)*100 : 0, 
+                totalRequests > 0 ? (tireReqs/totalRequests)*100 : 0, 
+                totalRequests > 0 ? (towReqs/totalRequests)*100 : 0,
+                v.gasRate * 100
+            ];
+            breakdownChart.update();
+
+            // Populate Results
+            outputs.subRev.innerText = formatVal(subRevenue);
+            
+            outputs.batCount.innerText = batReqs;
+            outputs.batProfit.innerText = "+" + formatVal(batProfit);
+            
+            outputs.tireCount.innerText = tireReqs;
+            outputs.tireProfit.innerText = "+" + formatVal(tireProfit);
+            
+            outputs.gasCount.innerText = gasReqs;
+            outputs.gasCost.innerText = "-" + formatVal(gasCost);
+
+            outputs.towCount.innerText = towReqs;
+            outputs.towCost.innerText = "-" + formatVal(towingCost);
+            
+            outputs.totalNet.innerText = formatVal(netProfit) + " ريال";
+            
+            if(netProfit < 0) {
+                outputs.totalNet.classList.remove('text-white');
+                outputs.totalNet.classList.add('text-red-400');
+            } else {
+                outputs.totalNet.classList.add('text-white');
+                outputs.totalNet.classList.remove('text-red-400');
+            }
+        }
+
+        Object.values(inputs).forEach(input => {
+            input.addEventListener('input', updateCalculator);
+        });
+
+        updateCalculator(); 
+
+    </script>
+</body>
+</html>
