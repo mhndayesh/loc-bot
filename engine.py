@@ -113,6 +113,47 @@ log = logging.getLogger("engine")
 # ── Agent Engine ───────────────────────────────────────────────────────
 class AgentEngine:
 
+    def get_native_tools(self):
+        """Builds a highly token-efficient OpenAI JSON Schema array for ALL tools."""
+        tools = [
+            {"name": "read_file", "args": ["path"]},
+            {"name": "write_file", "args": ["path", "content"]},
+            {"name": "append_file", "args": ["path", "content"]},
+            {"name": "list_dir", "args": ["path"]},
+            {"name": "run_command", "args": ["cmd"]},
+            {"name": "create_tool", "args": ["name", "code"]},
+            {"name": "sync_skills", "args": []},
+            {"name": "compact_memory", "args": []},
+            {"name": "update_state", "args": ["goal", "status"]},
+            {"name": "create_plan", "args": ["steps"]},
+            {"name": "update_plan_step", "args": ["idx", "status"]},
+            {"name": "replan", "args": ["start_idx", "new_steps"]},
+            {"name": "recall", "args": ["query"]},
+            {"name": "memorize", "args": ["content"]}
+        ]
+        
+        # Add custom skills minimally
+        if os.path.exists(SKILLS_DIR):
+            for s in sorted(os.listdir(SKILLS_DIR)):
+                if s.endswith(".py"):
+                    tools.append({"name": s.replace(".py", ""), "args": ["arg1", "arg2"]})
+
+        schema = []
+        for t in tools:
+            props = {k: {"type": "string"} for k in t["args"]}
+            schema.append({
+                "type": "function",
+                "function": {
+                    "name": t["name"],
+                    "parameters": {
+                        "type": "object",
+                        "properties": props,
+                        "required": t["args"]
+                    }
+                }
+            })
+        return schema
+
     def __init__(self):
         self._ensure_dirs()
         self.state = self._load_state()
@@ -664,15 +705,14 @@ class AgentEngine:
                 parts.append(f"## Dynamic Instructions\nFollow these guidelines:\n---\n{instructions}\n---")
 
         # 4. Mandatory Rules & Tools (Ultra-Lean Fallback)
-        # We only keep the absolute bare minimum to prevent total collapse if DB fails
         skills_text = self._read_file_safe(os.path.join(BASE_DIR, "SKILLS.md"), "No skills loaded.")
         parts.append(
             "## Rules & Tools\n"
             "1. Reason in `[THINK]...[/THINK]`.\n"
-            "2. Actions MUST use `[TOOL] name(args) [/TOOL]` syntax.\n"
-            "3. Refer to MAP.md for identity.\n\n"
+            "2. Refer to MAP.md for identity.\n\n"
             "## Available Tools\n"
-            f"{skills_text}"
+            f"{skills_text}\n"
+            "You MUST execute tools using your native JSON function calling capabilities."
         )
 
         # 5. Current State
@@ -688,7 +728,7 @@ class AgentEngine:
         return "\n\n".join(parts)
 
     # ── LLM call ───────────────────────────────────────────────────────
-    def call_llm(self, prompt: str = None, system_prompt: str = None, user_msg: str = None, images: list = None, json_format: bool = False, is_idle_heartbeat: bool = False, custom_stop: list = None) -> str:
+    def call_llm(self, prompt: str = None, system_prompt: str = None, user_msg: str = None, images: list = None, json_format: bool = False, is_idle_heartbeat: bool = False, custom_stop: list = None, tools: list = None) -> str:
         """
         Sends requests to the local OpenAI-compatible API or Ollama native API.json first, env vars override.
         Supports Ollama native (/api/chat) and OpenAI-compatible (/v1/chat/completions).
@@ -777,8 +817,28 @@ class AgentEngine:
                 
             if json_format:
                 payload["format"] = "json"
+                
+            if tools:
+                payload["tools"] = tools
 
-            extract = lambda data: data["message"]["content"]
+            # Extract handling for tool_calls translating back to String syntax
+            def ollama_extract(data):
+                msg = data.get("message", {})
+                if "tool_calls" in msg and msg["tool_calls"]:
+                    tc = msg["tool_calls"][0]
+                    fn = tc.get("function", {})
+                    name = fn.get("name", "")
+                    try:
+                        args_dict = fn.get("arguments", {})
+                        if isinstance(args_dict, str):
+                            args_dict = json.loads(args_dict)
+                        args_str = ", ".join([repr(v) for v in args_dict.values()])
+                        return f"[TOOL] {name}({args_str}) [/TOOL]"
+                    except:
+                        return f"[TOOL] {name}() [/TOOL]"
+                return msg.get("content", "")
+
+            extract = ollama_extract
 
         # ── OpenAI-compatible format ───────────────────────────────────
         else:
@@ -811,26 +871,82 @@ class AgentEngine:
                 
             if json_format:
                 payload["response_format"] = {"type": "json_object"}
+                
+            if tools:
+                payload["tools"] = tools
+                # Ensure tools schema structure maps correctly per provider quirks
+                if fmt == "openai" and "tool_choice" not in payload:
+                    payload["tool_choice"] = "auto"
 
             if max_tokens > 0:
                 payload["max_tokens"] = max_tokens
-            extract = lambda data: data["choices"][0]["message"]["content"]
+                
+            def openai_extract(data):
+                choices = data.get("choices", [])
+                if not choices: return ""
+                msg = choices[0].get("message", {})
+                
+                if "tool_calls" in msg and msg["tool_calls"]:
+                    tc = msg["tool_calls"][0]
+                    fn = tc.get("function", {})
+                    name = fn.get("name", "")
+                    try:
+                        args_dict = fn.get("arguments", "{}")
+                        if isinstance(args_dict, str):
+                            args_dict = json.loads(args_dict)
+                        args_str = ", ".join([repr(v) for v in args_dict.values()])
+                        return f"[TOOL] {name}({args_str}) [/TOOL]"
+                    except:
+                        return f"[TOOL] {name}() [/TOOL]"
+                return msg.get("content", "")
+
+            extract = openai_extract
 
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key}",
         }
 
+        # Attempt to acquire the global server lock to prevent crashing local inference engines
+        # with concurrent requests (e.g. background memory vs foreground chat).
+        # We use a dynamic lookup to avoid circular imports if engine.py is run standalone.
         try:
-            conn.request("POST", endpoint, json.dumps(payload), headers)
-            resp = conn.getresponse()
-            body = resp.read().decode()
-            if resp.status != 200:
-                return f"LLM_ERROR: HTTP {resp.status} — {body[:200]}"
-            data = json.loads(body)
-            return extract(data)
-        except Exception as e:
-            return f"LLM_ERROR: {e}"
+            import sys
+            llm_lock = sys.modules['server'].LLM_LOCK
+        except (KeyError, AttributeError):
+            import threading
+            # Fallback for standalone scripts
+            if not hasattr(self.__class__, '_fallback_lock'):
+                self.__class__._fallback_lock = threading.Lock()
+            llm_lock = self.__class__._fallback_lock
+
+        for attempt in range(3):
+            try:
+                with llm_lock:
+                    if parsed.scheme == "https":
+                        conn = http.client.HTTPSConnection(parsed.hostname, parsed.port or 443)
+                    else:
+                        conn = http.client.HTTPConnection(parsed.hostname, parsed.port or 11434)
+                    
+                    conn.request("POST", endpoint, json.dumps(payload), headers)
+                    resp = conn.getresponse()
+                    body = resp.read().decode()
+                    conn.close()
+                
+                if resp.status == 400 and "Model unloaded" in body:
+                    log.warning(f"LLM Model unloaded (likely due to embedding swap). Retrying in 5s... (Attempt {attempt+1}/3)")
+                    time.sleep(5)
+                    continue
+
+                if resp.status != 200:
+                    return f"LLM_ERROR: HTTP {resp.status} — {body[:200]}"
+                    
+                data = json.loads(body)
+                return extract(data)
+            except Exception as e:
+                return f"LLM_ERROR: {e}"
+                
+        return "LLM_ERROR: HTTP 400 — Model unloaded completely and failed to reload after 3 attempts."
 
     def classify_memory(self, text: str) -> str:
         """JSON Chain-of-Thought Meta-Tagging to classify FACT vs CHATTER."""
@@ -1075,8 +1191,21 @@ TEXT:
         if temporarily_disable_thinking:
             prompt = prompt.replace("1. Reason in `[THINK]...[/THINK]`.", "")
         
-        response = self.call_llm(prompt)
+        # Inject the universal native tool into the LLM call payload unless we're idling
+        native_tools = None if temporarily_disable_thinking else self.get_native_tools()
+        
+        response = self.call_llm(prompt, tools=native_tools)
         log.info("LLM responded (%d chars)", len(response))
+
+        # Check for Infrastructure Error
+        if response.startswith("LLM_ERROR:"):
+            log.error("Aborting pulse due to infrastructure error: %s", response)
+            # Revert goal to idle if chat so it doesn't spin wildly, but leave it alone for tasks
+            if mode == "chat":
+                self.state["goal"] = "done"
+                self.state["status"] = "error"
+                self.save_state()
+            return
 
         # Check for Silent Reply (ONLY in non-chat modes)
         if mode != "chat":

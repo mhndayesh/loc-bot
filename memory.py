@@ -137,23 +137,35 @@ class MemoryMaker:
         # Guard against massive token overflow warnings (1 token ~ 4 chars)
         safe_text = text[:8000]
 
+        # Acquire global generation lock if possible to prevent LM Studio crash
+        try:
+            import sys
+            llm_lock = sys.modules['server'].LLM_LOCK
+        except (KeyError, AttributeError):
+            import threading
+            if not hasattr(self.__class__, '_fallback_lock'):
+                self.__class__._fallback_lock = threading.Lock()
+            llm_lock = self.__class__._fallback_lock
+
         for attempt in range(3):
             try:
                 if api_format == "ollama":
-                    resp = requests.post(f"{url}/api/embeddings", json={
-                        "model": model,
-                        "prompt": safe_text
-                    }, timeout=15)
+                    with llm_lock:
+                        resp = requests.post(f"{url}/api/embeddings", json={
+                            "model": model,
+                            "prompt": safe_text
+                        }, timeout=15)
                     return resp.json().get("embedding")
                 else: # OpenAI format
                     headers = {"Authorization": f"Bearer {api_key}"}
                     # ROBUST PATH: If base_url already has /v1, don't add it again
                     endpoint = f"{url}/embeddings" if url.endswith("/v1") else f"{url}/v1/embeddings"
                     
-                    resp = requests.post(endpoint, headers=headers, json={
-                        "model": model,
-                        "input": safe_text
-                    }, timeout=15)
+                    with llm_lock:
+                        resp = requests.post(endpoint, headers=headers, json={
+                            "model": model,
+                            "input": safe_text
+                        }, timeout=15)
                     
                     data = resp.json().get("data", [])
                     if data:
