@@ -884,12 +884,16 @@ TEXT:
 
     def extract_keywords(self, user_query):
         """Phase IX: Agentic Query Expansion"""
-        prompt = f"You are a search query optimizer. Extract the core nouns, entities, themes, and specific details from the following user question.\nOutput ONLY a comma-separated list of keywords. Do NOT write sentences. Do NOT answer the question. Do NOT output <think> tags.\n\nUSER QUESTION: \"{user_query}\"\nKEYWORDS:"
-        resp = self.call_llm(system_prompt="You extract keywords only. No formatting. No sentences. No <think> tags.", user_msg=prompt, json_format=False, custom_stop=["<think>"])
+        prompt = f"You are a search query optimizer. Extract the core nouns, entities, themes, and specific details from the following user question.\nOutput ONLY a comma-separated list of keywords. Do NOT write sentences. Do NOT answer the question. Do NOT output <think> tags. Do NOT output JSON.\n\nUSER QUESTION: \"{user_query}\"\nKEYWORDS:"
+        resp = self.call_llm(system_prompt="You extract keywords only. No formatting. No sentences. No <think> tags. No JSON.", user_msg=prompt, json_format=False, custom_stop=["<think>"])
         if "LLM_ERROR" in resp: return user_query[:500]
         
         # Strip reasoning tags (vital for DeepSeek models)
         resp = self.strip_thinking(resp)
+        # Strip hallucinated markdown JSON blocks
+        resp = re.sub(r'```json\s*\{.*?\}\s*```', '', resp, flags=re.DOTALL | re.IGNORECASE).strip()
+        # Extra sanitization against straggling JSON characters
+        resp = re.sub(r'[{}[\]"\']', '', resp)
         
         # Deduplicate
         unique_kws = list(dict.fromkeys([k.strip() for k in resp.split(',') if k.strip()]))
@@ -955,19 +959,33 @@ TEXT:
                 included_indices = [center_idx]
                 left, right = center_idx - 1, center_idx + 1
                 
-                while (left >= 0 or right < len(group_results)) and current_len < max_budget:
-                    if left >= 0:
+                left_blocked, right_blocked = False, False
+                
+                while (not left_blocked or not right_blocked) and current_len < max_budget:
+                    if not left_blocked and left >= 0:
                         l_len = len(group_results[left]["text"])
                         if current_len + l_len <= max_budget:
                             included_indices.append(left)
                             current_len += l_len
-                        left -= 1
-                    if right < len(group_results) and current_len < max_budget:
+                            left -= 1
+                        else:
+                            left_blocked = True
+                    else:
+                        left_blocked = True
+                        
+                    if not right_blocked and right < len(group_results) and current_len < max_budget:
                         r_len = len(group_results[right]["text"])
                         if current_len + r_len <= max_budget:
                             included_indices.append(right)
                             current_len += r_len
-                        right += 1
+                            right += 1
+                        else:
+                            right_blocked = True
+                    else:
+                        right_blocked = True
+                        
+                    if left_blocked and right_blocked:
+                        break
                         
                 included_indices.sort()
                 for k in included_indices:
