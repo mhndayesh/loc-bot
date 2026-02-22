@@ -688,9 +688,9 @@ class AgentEngine:
         return "\n\n".join(parts)
 
     # ── LLM call ───────────────────────────────────────────────────────
-    def call_llm(self, system_prompt: str, user_msg: str = "", images: list = None, json_format: bool = False) -> str:
+    def call_llm(self, prompt: str = None, system_prompt: str = None, user_msg: str = None, images: list = None, json_format: bool = False, is_idle_heartbeat: bool = False, custom_stop: list = None) -> str:
         """
-        Call a local LLM.  Reads from config.json first, env vars override.
+        Sends requests to the local OpenAI-compatible API or Ollama native API.json first, env vars override.
         Supports Ollama native (/api/chat) and OpenAI-compatible (/v1/chat/completions).
         """
         import http.client
@@ -772,6 +772,8 @@ class AgentEngine:
             }
             if is_idle_heartbeat:
                 payload["options"]["stop"] = [".", "[SILENT_OK]"]
+            elif custom_stop:
+                payload["options"]["stop"] = custom_stop
                 
             if json_format:
                 payload["format"] = "json"
@@ -801,6 +803,8 @@ class AgentEngine:
             }
             if is_idle_heartbeat:
                 payload["stop"] = [".", "[SILENT_OK]"]
+            elif custom_stop:
+                payload["stop"] = custom_stop
                 
             if json_format:
                 payload["response_format"] = {"type": "json_object"}
@@ -877,9 +881,12 @@ TEXT:
 
     def extract_keywords(self, user_query):
         """Phase IX: Agentic Query Expansion"""
-        prompt = f"You are a search query optimizer. Extract the core nouns, entities, themes, and specific details from the following user question.\nOutput ONLY a comma-separated list of keywords. Do NOT write sentences. Do NOT answer the question.\n\nUSER QUESTION: \"{user_query}\"\nKEYWORDS:"
-        resp = self.call_llm(system_prompt="You extract keywords only. No formatting. No sentences.", user_msg=prompt, json_format=False)
+        prompt = f"You are a search query optimizer. Extract the core nouns, entities, themes, and specific details from the following user question.\nOutput ONLY a comma-separated list of keywords. Do NOT write sentences. Do NOT answer the question. Do NOT output <think> tags.\n\nUSER QUESTION: \"{user_query}\"\nKEYWORDS:"
+        resp = self.call_llm(system_prompt="You extract keywords only. No formatting. No sentences. No <think> tags.", user_msg=prompt, json_format=False, custom_stop=["<think>"])
         if "LLM_ERROR" in resp: return user_query[:500]
+        
+        # Strip reasoning tags (vital for DeepSeek models)
+        resp = self.strip_thinking(resp)
         
         # Deduplicate
         unique_kws = list(dict.fromkeys([k.strip() for k in resp.split(',') if k.strip()]))
@@ -908,10 +915,14 @@ TEXT:
             for i, hit in enumerate(eval_hits):
                 snippet_list += f"\n--- SNIPPET {i} ---\n{hit['entry']['text'][:800]}\n"
             
-            sel_prompt = f"You are a search router. The user asked: \"{user_query[:200]}\"\nBelow are {len(eval_hits)} snippets from a database. Identify WHICH SINGLE SNIPPET is MOST LIKELY to contain the answer or be relevant to the topic.\nOutput ONLY the integer number of the snippet (e.g., 0, 1, 2). If absolutely none seem relevant, output 0 as a default. Do not explain.\n{snippet_list}"
+            sel_prompt = f"You are a search router. The user asked: \"{user_query[:200]}\"\nBelow are {len(eval_hits)} snippets from a database. Identify WHICH SINGLE SNIPPET is MOST LIKELY to contain the answer or be relevant to the topic.\nOutput ONLY the integer number of the snippet (e.g., 0, 1, 2). If absolutely none seem relevant, output 0 as a default. Do not explain. Do not use <think> tags.\n{snippet_list}"
             
             # Call router LLM
-            resp = self.call_llm(system_prompt="You are a strict routing AI. Only output integers.", user_msg=sel_prompt, json_format=False)
+            resp = self.call_llm(system_prompt="You are a strict routing AI. Only output integers. Do not use <think> tags.", user_msg=sel_prompt, json_format=False, custom_stop=["<think>"])
+            
+            # Strip reasoning
+            resp = self.strip_thinking(resp)
+            
             match = re.search(r'-?\d+', resp)
             if match:
                 selected_idx = int(match.group())
