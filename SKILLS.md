@@ -23,6 +23,7 @@
 - `git_commit.py`: Skill: git_commit
 - `kill_process.py`: Skill: kill_process
 - `list_dir.py`: List the contents of a specified directory.
+- `port_checker.py`: Custom tool.
 - `run_in_env.py`: run_in_env: Execute scripts within specific virtual environments.
 - `search_web.py`: search_web: Search the web via DuckDuckGo HTML (no API key needed).
 - `static_analysis.py`: Skill: static_analysis

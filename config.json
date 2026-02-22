@@ -1,5 +1,5 @@
 {
-  "provider": "ollama",
+  "provider": "lmstudio",
   "providers": {
     "ollama": {
       "base_url": "http://localhost:11434",
@@ -12,13 +12,13 @@
       "api_format": "openai"
     }
   },
-  "model": "llama3.2:3b",
+  "model": "deepseek/deepseek-r1-0528-qwen3-8b",
   "temperature": 0.5,
-  "num_ctx": 4096,
+  "num_ctx": 8192,
   "max_tokens": 4096,
   "thinking_enabled": false,
-  "embedding_provider": "ollama",
-  "embedding_model": "nomic-embed-text",
+  "embedding_provider": "lmstudio",
+  "embedding_model": "text-embedding-nomic-embed-text-v1.5@f32",
   "heartbeat_interval": 60,
   "permissions": {
     "run_command": true,
@@ -32,5 +32,5 @@
     "update_state": true
   },
   "heartbeat_running": false,
-  "embedding_trigger": 4000
+  "embedding_trigger": 2048
 }

@@ -31,6 +31,11 @@ heartbeat_thread = None
 heartbeat_running = False
 LOG_BUFFER = collections.deque(maxlen=2000)
 
+# ── Global LLM Concurrency Lock ───────────────────────────────────────
+# Prevents LM Studio / Ollama from evicting models or throwing HTTP 500s 
+# when background memory tagging collides with foreground chat pulses.
+LLM_LOCK = threading.Lock()
+
 # ── Session Tracker ───────────────────────────────────────────────────
 import uuid
 current_session_block_id = str(uuid.uuid4())
@@ -218,10 +223,12 @@ def run_heartbeat():
             
             if (current_time - last_activity > REFLECT_THRESHOLD) and (last_activity > last_reflection):
                 log.info("Agent idle for %d seconds. Triggering Memory Reflection...", int(current_time - last_activity))
-                subprocess.run(
-                    [sys.executable, engine_path, "--once", "--mode", "reflect"],
-                    env=env, capture_output=True
-                )
+                try:
+                    for k, v in env.items(): os.environ[k] = str(v)
+                    engine = AgentEngine()
+                    engine.pulse(mode="reflect")
+                except Exception as e:
+                    log.error("Reflection failed: %s", e)
             
             # --- Active Goal Pursuit Trigger ---
             goal = state.get("goal", "").lower().strip()
@@ -249,17 +256,19 @@ def run_heartbeat():
                 pass 
             else:
                 mode = "chat" if is_active else "heartbeat"
-                with subprocess.Popen(
-                    [sys.executable, engine_path, "--once", "--mode", mode],
-                    env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                    text=True, bufsize=1, encoding='utf-8', errors='replace'
-                ) as proc:
-                    is_silent = False
-                    if proc.stdout:
-                        for line in proc.stdout:
-                            LOG_BUFFER.append(line.rstrip())
-                            if "SILENT REPLY" in line:
-                                is_silent = True
+                try:
+                    for k, v in env.items(): os.environ[k] = str(v)
+                    
+                    state_before = load_json(STATE_FILE)
+                    last_ts_before = state_before.get("last_reply_ts")
+                    
+                    engine = AgentEngine()
+                    engine.pulse(mode=mode)
+                    
+                    state_after = load_json(STATE_FILE)
+                    ts_after = state_after.get("last_reply_ts")
+                    
+                    is_silent = (ts_after == last_ts_before)
                     
                     if is_silent:
                         log.info("Engine was silent. Applying backoff sleep: %ds", base_interval)
@@ -289,6 +298,8 @@ def run_heartbeat():
                                         log.info("Persistent Memory: Heartbeat reply saved to session %s", sid)
                         except Exception as pe:
                             log.warning("Persistence error in heartbeat: %s", pe)
+                except Exception as err:
+                    log.error("Engine pulse failed: %s", err)
             
         except Exception as e:
             log.error("Pulse error: %s", e)
@@ -836,15 +847,31 @@ class AgentAPIHandler(SimpleHTTPRequestHandler):
                         payload["max_tokens"] = max_tokens
                     extract_fn = lambda d: d["choices"][0]["message"]["content"]
                     
-                    # DEBUG LOG (Truncated)
-                    log.debug("Sending OpenAI payload with %d messages. Images: %s", 
-                              len(final_messages), "Yes" if any("_image_payloads" in m or isinstance(m.get("content"), list) for m in messages) else "No")
+                # DEBUG LOG (Truncated)
+                log.debug("Sending OpenAI payload with %d messages. Images: %s", 
+                          len(final_messages), "Yes" if any("_image_payloads" in m or isinstance(m.get("content"), list) for m in messages) else "No")
 
                 headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
-                conn.request("POST", endpoint, json.dumps(payload), headers)
-                resp = conn.getresponse()
-                resp_body = resp.read().decode()
-                conn.close()
+                payload_json = json.dumps(payload)
+                
+                for attempt in range(3):
+                    with LLM_LOCK:
+                        p = urlparse(base_url)
+                        if p.scheme == "https":
+                            conn = http.client.HTTPSConnection(p.hostname, p.port or 443, timeout=300)
+                        else:
+                            conn = http.client.HTTPConnection(p.hostname, p.port or 11434, timeout=300)
+
+                        conn.request("POST", endpoint, payload_json, headers)
+                        resp = conn.getresponse()
+                        resp_body = resp.read().decode()
+                        conn.close()
+                    
+                    if resp.status == 400 and "Model unloaded" in resp_body:
+                        log.warning(f"LLM Model unloaded (VRAM swap). Retrying in 5s... (Attempt {attempt+1}/3)")
+                        time.sleep(5)
+                        continue
+                    break
 
                 if resp.status != 200:
                     self._json_response({"error": f"LLM returned HTTP {resp.status}: {resp_body[:300]}"}, 502)
@@ -852,6 +879,10 @@ class AgentAPIHandler(SimpleHTTPRequestHandler):
 
                 data = json.loads(resp_body)
                 reply = extract_fn(data)
+
+                if reply.startswith("LLM_ERROR:"):
+                    self._json_response({"error": f"Model error: {reply}"}, 500)
+                    return
 
                 # --- TOOL EXECUTION INTEGRATION ---
                 
