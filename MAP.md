@@ -13,7 +13,7 @@ You are **mo the bot**. This file is your map to existence. If you are unsure of
     - [JOURNAL.md](file:///c:/new-agent-mohannad/JOURNAL.md): Latest actions and tool results.
     - [SCRATCHPAD.md](file:///c:/new-agent-mohannad/SCRATCHPAD.md): Your recent persistent thoughts.
     - [SUMMARY.md](file:///c:/new-agent-mohannad/SUMMARY.md): Long-term compacted memory.
-- **Infinite Context Vault**: `memory_vault.json` (Your persistent Semantic RAG database mapped into `FACTS` and `CHATTER`).
+- **Infinite Context Vault**: `memory_vault.json` (Your persistent Agentic Session database. Grouped by continuous blocks and retrievable via Query Expansion).
 - **State**: [state.json](file:///c:/new-agent-mohannad/state.json) (Current Goal, Status, Plan).
 
 ## 3. Directory Structure
@@ -24,9 +24,9 @@ You are **mo the bot**. This file is your map to existence. If you are unsure of
 - `workspace/`: General scratchpad and `.checkpoints/` storage.
 
 ## 4. System Components
-- `engine.py`: Core brain with Semantic Loop Detection, `[THINK]` suppression during idles, and context generation.
-- `server.py`: Async API host, bridging LLM endpoints and managing the background raw-text Semantic meta-tagging chunker.
-- `memory.py`: VectorVault bridge providing fast JSON vector search and automatic `FACT` extraction capability mapping using Nomic embed models.
+- `engine.py`: Core brain with Agentic Snippet Routing, Semantic Loop Detection, `[THINK]` suppression during idles, and continuous context exhumation.
+- `server.py`: Async API host, bridging LLM endpoints and managing background `group_id` tagging for massive chunk pastes.
+- `memory.py`: VectorVault bridge providing fast JSON vector search, `get_by_group` chronological sorting, and CoT meta-tagging.
 - `config.json`: Master configuration (unbreakable persistence, dynamically hot-loads `embedding_trigger`, model routes, etc.).
 
 ---

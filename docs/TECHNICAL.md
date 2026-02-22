@@ -30,7 +30,7 @@ The `server.py` exposes the following REST endpoints (Port 7777 by default).
 ### The `pulse()` Method
 The core loop of the agent.
 1.  **Reload State**: `self._load_state()` (Critical for concurrency).
-2.  **Semantic Retrieval**: Queries `VectorVault` for highest-confidence `FACTS` corresponding to the `goal`.
+2.  **Agentic Context Exhumation**: `engine.agentic_recall()` forces the LLM to rewrite the query into keywords, votes on the top 3 vector chunks to find the absolute best hit, and then queries the `VectorVault` for all chronologically adjacent chunks sharing the same `group_id` (Continuous Session Block).
 3.  **Assemble Prompt**: `self.get_full_prompt()`. Overrides `temporarily_disable_thinking` if idling.
 4.  **Call LLM**: `self.call_llm()` (with 300s socket timeout). DeepSeek chains are suppressed during idle heartbeats via `stop: ["."]`.
 5.  **Parse Response**: Uses `ast.literal_eval` and regex for robust `[THINK]` and `[TOOL]` extraction.

@@ -9,11 +9,11 @@ The system consists of three main intelligent components:
 1.  **Server (`server.py`)**:
     *   A lightweight HTTP server (Python `http.server`).
     *   Serves the GUI (`gui/`) and exposes a REST API (`/api/...`).
-    *   **Asynchronous Embedding Engine**: To prevent Chat Input freezing when users paste 10,000+ characters, `server.py` implements "Paste Protection". It spins off a background Thread that chunks the massive paste according to `config.json` limit (`embedding_trigger`) and pipelines them into the `VectorVault`.
+    *   **Asynchronous Embedding Engine**: To prevent Chat Input freezing when users paste 10,000+ characters, `server.py` implements "Paste Protection". It spins off a background Thread that chunks the massive paste according to `config.json` limit (`embedding_trigger`) and pipelines them into the `VectorVault` with `group_id` Session Metadata.
 
 2.  **Engine (`engine.py`)**:
     *   The brain of the agent, executed via `subprocess` by the server for isolation.
-    *   **Semantic RAG Builder**: Before building the LLM context, `engine.pulse()` asks the memory module to extract the top `FACTS` semantically relevant to the current `goal`.
+    *   **Agentic Session Routing**: Before building the LLM context, both `server.py` (chat) and `engine.pulse()` use the active LLM to logically expand user queries, mathematically route to the best vector match, and then systematically exhume the entire 6,000+ character continuous Conversation Block (Session).
     *   **Idle Optimization**: During `/api/heartbeat` sweeps, if there is no goal, `engine.py` dynamically enforces `temporarily_disable_thinking` and injects `stop: ["."]` into the LM payload to completely annihilate deep-thinking hallucination loops when idle, optimizing VRAM/CPU.
 
 3.  **Memory (`memory.py`)**:

@@ -875,6 +875,98 @@ TEXT:
             log.warning(f"Classification JSON Error: {e}")
             return "FACT" # Safest default
 
+    def extract_keywords(self, user_query):
+        """Phase IX: Agentic Query Expansion"""
+        prompt = f"You are a search query optimizer. Extract the core nouns, entities, themes, and specific details from the following user question.\nOutput ONLY a comma-separated list of keywords. Do NOT write sentences. Do NOT answer the question.\n\nUSER QUESTION: \"{user_query}\"\nKEYWORDS:"
+        resp = self.call_llm(system_prompt="You extract keywords only. No formatting. No sentences.", user_msg=prompt, json_format=False)
+        if "LLM_ERROR" in resp: return user_query[:500]
+        
+        # Deduplicate
+        unique_kws = list(dict.fromkeys([k.strip() for k in resp.split(',') if k.strip()]))
+        return ', '.join(unique_kws)[:500]
+        
+    def agentic_recall(self, user_query, max_budget=6000):
+        """Phase IX/XI: Query Expansion, Snippet Routing, and Seasonal Exhumation"""
+        # 1. Expand Query
+        expanded_query = self.extract_keywords(user_query[:2000])
+        log.info(f"💡 [Pre-Search Expander] Rewrote '{user_query[:80]}' -> '{expanded_query[:80]}'")
+        
+        # 2. Vector Search
+        doc_hits = memory.recall(expanded_query, n_results=10, where={"type": "FACT"})
+        if not doc_hits: return ""
+        
+        # Ensure list of dict format
+        if not isinstance(doc_hits, list): 
+            return "" # Memory recall handles lists if n_results > 1
+            
+        eval_hits = doc_hits[:3]
+        target_group_id = None
+        selected_idx = 0
+        
+        if len(eval_hits) > 1:
+            snippet_list = ""
+            for i, hit in enumerate(eval_hits):
+                snippet_list += f"\n--- SNIPPET {i} ---\n{hit['entry']['text'][:800]}\n"
+            
+            sel_prompt = f"You are a search router. The user asked: \"{user_query[:200]}\"\nBelow are {len(eval_hits)} snippets from a database. Identify WHICH SINGLE SNIPPET is MOST LIKELY to contain the answer or be relevant to the topic.\nOutput ONLY the integer number of the snippet (e.g., 0, 1, 2). If absolutely none seem relevant, output 0 as a default. Do not explain.\n{snippet_list}"
+            
+            # Call router LLM
+            resp = self.call_llm(system_prompt="You are a strict routing AI. Only output integers.", user_msg=sel_prompt, json_format=False)
+            match = re.search(r'-?\d+', resp)
+            if match:
+                selected_idx = int(match.group())
+                if 0 <= selected_idx < len(eval_hits):
+                    target_group_id = eval_hits[selected_idx]["entry"].get("metadata", {}).get("group_id")
+                    
+        if target_group_id is None and doc_hits:
+            target_group_id = doc_hits[0]["entry"].get("metadata", {}).get("group_id")
+            
+        # 3. Exhume Continuous Session
+        facts = []
+        if target_group_id:
+            try:
+                # get_by_group returns sorted by chunk_index
+                group_results = memory.vault.get_by_group(target_group_id)
+                
+                # find center
+                target_chunk_idx = eval_hits[selected_idx]["entry"].get("metadata", {}).get("chunk_index", 0) if 0 <= selected_idx < len(eval_hits) else 0
+                
+                center_idx = 0
+                for k, entry in enumerate(group_results):
+                    if entry.get("metadata", {}).get("chunk_index", -1) == target_chunk_idx:
+                        center_idx = k
+                        break
+                        
+                current_len = len(group_results[center_idx]["text"])
+                included_indices = [center_idx]
+                left, right = center_idx - 1, center_idx + 1
+                
+                while (left >= 0 or right < len(group_results)) and current_len < max_budget:
+                    if left >= 0:
+                        l_len = len(group_results[left]["text"])
+                        if current_len + l_len <= max_budget:
+                            included_indices.append(left)
+                            current_len += l_len
+                        left -= 1
+                    if right < len(group_results) and current_len < max_budget:
+                        r_len = len(group_results[right]["text"])
+                        if current_len + r_len <= max_budget:
+                            included_indices.append(right)
+                            current_len += r_len
+                        right += 1
+                        
+                included_indices.sort()
+                for k in included_indices:
+                    facts.append(group_results[k]["text"])
+                    
+                log.info(f"💡 [Agentic Route] Exhumed full session context ({current_len} chars) around Group ID {target_group_id[:8]}...")
+                return "\n---\n".join(facts)
+            except Exception as e:
+                log.error(f"[Group Retrieval Error] {e}")
+                
+        # Fallback to standard naive RAG
+        return "\n---\n".join([h["entry"]["text"] for h in doc_hits[:3]])
+
     # ── Main loop / pulse ──────────────────────────────────────────────
     def pulse(self, mode: str = "chat"):
         """Run one think→act→reflect cycle."""
@@ -905,14 +997,8 @@ TEXT:
             self.save_state()
             return
 
-        # 1. JIT MEMORY RECALL (Core Function)
-        fact_results = memory.recall(user_goal, n_results=10, where={"type": "FACT"})
-        past_wisdom = ""
-        if fact_results:
-            if isinstance(fact_results, list):
-                past_wisdom = "\n---\n".join([m["entry"]["text"] for m in fact_results])[:8000]
-            else:
-                past_wisdom = fact_results[:8000]
+        # 1. JIT MEMORY RECALL (Core Function) - Agentic
+        past_wisdom = self.agentic_recall(user_goal, max_budget=8000)
 
         if past_wisdom:
             log.info("💡 [Memory] Injecting past wisdom (FACTS) into context.")

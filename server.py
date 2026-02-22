@@ -31,6 +31,13 @@ heartbeat_thread = None
 heartbeat_running = False
 LOG_BUFFER = collections.deque(maxlen=2000)
 
+# ── Session Tracker ───────────────────────────────────────────────────
+import uuid
+current_session_block_id = str(uuid.uuid4())
+last_interaction_time = time.time()
+session_chunk_index = 0
+IDLE_TIMEOUT_SECONDS = 300
+
 # Attach buffer handler to root logger
 # REMOVED BufferHandler to avoid duplication with ConsoleInterceptor
 
@@ -666,6 +673,16 @@ class AgentAPIHandler(SimpleHTTPRequestHandler):
 
         # ── Chat ───────────────────────────────────────────────────────
         if path == "/api/chat":
+            global current_session_block_id, last_interaction_time, session_chunk_index
+            
+            # --- SESSION IDLE CHECK ---
+            current_time = time.time()
+            if (current_time - last_interaction_time) > IDLE_TIMEOUT_SECONDS:
+                current_session_block_id = str(uuid.uuid4())
+                session_chunk_index = 0
+                log.info(f"Idle timeout detected (>5m). Began new session block: {current_session_block_id[:8]}...")
+            last_interaction_time = current_time
+
             user_msg = body.get("message", "")
             files = body.get("files", [])  # [{name, type, content}]
             history = body.get("history", [])  # previous messages
@@ -725,16 +742,12 @@ class AgentAPIHandler(SimpleHTTPRequestHandler):
 
             sys_prompt = _build_chat_system_prompt(thinking)
             
+            # Instantiate a transient engine early to process RAG and Tools
+            engine = AgentEngine()
+            
             # --- JIT MEMORY RECALL (Core Intelligence) ---
-            num_ctx = config.get("num_ctx", 2048)
-            # Fetch Top 10 Facts
-            fact_results = memory.recall(user_msg, n_results=10, where={"type": "FACT"})
-            past_wisdom = ""
-            if fact_results:
-                if isinstance(fact_results, list):
-                    past_wisdom = "\n---\n".join([m["entry"]["text"] for m in fact_results])[:8000]
-                else:
-                    past_wisdom = fact_results[:8000]
+            # Use Agentic Query Expansion & Full Session Reassembly
+            past_wisdom = engine.agentic_recall(user_msg, max_budget=8000)
 
             if past_wisdom:
                 log.info("💡 [Memory/Chat] Injecting %d chars of FACTs into GUI context.", len(past_wisdom))
@@ -750,10 +763,17 @@ class AgentAPIHandler(SimpleHTTPRequestHandler):
             chunk_cap = int(config.get("embedding_trigger", 2048))
             if len(user_msg) > chunk_cap:
                 def _pre_embed_chunks(text):
+                    global session_chunk_index
                     chunks = [text[i:i+chunk_cap] for i in range(0, len(text), chunk_cap)]
-                    for chunk in chunks:
+                    paste_group_id = str(uuid.uuid4())
+                    for idx, chunk in enumerate(chunks):
                         try:
-                            memory.vault.add(chunk, metadata={"type": "FACT"})
+                            memory.vault.add(chunk, metadata={
+                                "type": "FACT",
+                                "group_id": paste_group_id,
+                                "chunk_index": idx,
+                                "total_chunks": len(chunks)
+                            })
                         except: pass
                 threading.Thread(target=_pre_embed_chunks, args=(user_msg,), daemon=True).start()
 
@@ -828,8 +848,6 @@ class AgentAPIHandler(SimpleHTTPRequestHandler):
                 reply = extract_fn(data)
 
                 # --- TOOL EXECUTION INTEGRATION ---
-                # Instantiate a transient engine to process chat-based tool calls
-                engine = AgentEngine()
                 
                 # 1. Save thinking to scratchpad (if any)
                 thinking = engine.parse_thinking(reply)
@@ -845,16 +863,24 @@ class AgentAPIHandler(SimpleHTTPRequestHandler):
                     # For now, we'll just allow the side-effects to happen.
                     
                 # 3. Async Memory Tagging
-                def _save_memory(u_msg, a_reply):
+                # Extract chunk index synchronously to avoid race conditions
+                saved_chunk_index = session_chunk_index
+                session_chunk_index += 1
+                
+                def _save_memory(u_msg, a_reply, grp_id, chk_idx):
                     combined_text = f"U: {u_msg}\nAI: {a_reply}"
                     try:
                         memory_type = engine.classify_memory(combined_text)
-                        memory.vault.add(combined_text, metadata={"type": memory_type})
-                        log.info("🧠 Saved memory tagged as [%s]", memory_type)
+                        memory.vault.add(combined_text, metadata={
+                            "type": memory_type,
+                            "group_id": grp_id,
+                            "chunk_index": chk_idx
+                        })
+                        log.info("🧠 Saved memory tagged as [%s] in session %s", memory_type, grp_id[:8])
                     except Exception as tag_err:
                         log.debug("Memory tagging failed: %s", tag_err)
                         
-                threading.Thread(target=_save_memory, args=(user_msg, reply), daemon=True).start()
+                threading.Thread(target=_save_memory, args=(user_msg, reply, current_session_block_id, saved_chunk_index), daemon=True).start()
                 # ----------------------------------
 
                 self._json_response({"reply": reply})

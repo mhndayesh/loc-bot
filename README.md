@@ -1,7 +1,15 @@
 # loc-bot 🤖
 **A Self-Evolving, Infinite Context AI Agent System**
 
-`loc-bot` is a powerful, autonomous AI agent designed to run strictly locally on your machine. It executes complex tasks, manages its own environment, and leverages a dual-model RAG architecture to achieve infinite short-term memory scaling without blowing out VRAM context limits.
+`loc-bot` is a powerful, autonomous AI agent designed to run strictly locally on your machine. It executes complex tasks, manages its own environment, and leverages a breakthrough memory architecture to achieve **Infinite Context Scaling** without blowing out the VRAM limits of consumer-grade graphics cards.
+
+> **Built On Groundbreaking Tech**: The extremely long context window technique utilized by this agent is inspired by and built upon [**mhndayesh/infinite-context-rag**](https://github.com/mhndayesh/infinite-context-rag). 
+
+### 🤯 Extremely Long Context for Consumer PCs
+Running models locally on consumer hardware usually means sacrificing context size (e.g., capping at 4k or 8k tokens) to prevent Out-Of-Memory (OOM) GPU crashes. `loc-bot` bypasses this hardware limitation using **Agentic Session Memory**:
+- **Massive Document Ingestion**: You can paste 100-page PDFs or 10,000 lines of code into the chat. `loc-bot` will asynchronously embed it in the background without freezing your PC.
+- **Continuous Session Tracking**: Your long debugging sessions are tracked as continuous blocks of time. When the agent needs to recall a fact from 50 messages ago, it doesn't just pull an isolated sentence—it exhumes a massive 6,000+ character continuous window centered exactly around the relevant thought. 
+- **Agentic Routing**: The local AI acts as its own search engine, dynamically expanding your queries into dense keywords and mathematically voting on the best memories to retrieve.
 
 ## 🚀 Quick Start
 
@@ -14,19 +22,15 @@
     ```bash
     git clone https://github.com/mhndayesh/loc-bot.git
     cd loc-bot
-    pip install -r requirements.txt  # (if applicable, or just standard lib)
+    pip install -r requirements.txt
     ```
 
 3.  **Run**:
-    Double-click `start.bat` or run:
-    ```bash
-    start.bat
-    ```
-    The GUI will open at `http://localhost:7777`.
+    Double-click `start.bat` or run `server.py` through Python. The GUI will open at `http://localhost:7777`.
 
 ## ✨ Key Features
 
-*   **Infinite Context Architecture (RAG)**: The agent dynamically chunks, embeds, and stores every chat message, code paste, and thought process in a persistent lightweight `VectorVault`. It dynamically injects exactly what it needs into the context window, effectively providing infinite memory on small local models.
+*   **Dual-Layer Memory Architecture**: Relies on **Session Memory** to track immediate context chronologically and a background **Dreaming Loop** to consolidate generalized wisdom and permanent rules over time.
 *   **Semantic Meta-Tagging**: A specialized background engine automatically intercepts raw data and tags it via CoT parsing as a `FACT` or `CHATTER`. The engine explicitly searches for `FACTS` when planning tasks, dramatically increasing retrieval accuracy.
 *   **Zero-Overhead Idling**: DeepSeek reasoning (`<think>`) loops are forcefully cut by API stop-tokens during agent heartbeats to prevent massive compute waste when idle.
 *   **Autonomous Resilience**: Advanced **Semantic Loop Detection** prevents repetitive error cycles by analyzing the semantic similarity of execution failures.

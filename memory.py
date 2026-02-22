@@ -253,6 +253,17 @@ class VectorVault:
                 self.save()
                 return entry["id"]
 
+    def get_by_group(self, group_id):
+        """Returns all memory chunks matching a specific group_id (Session Block), sorted chronologically by chunk_index."""
+        if not self.data: return []
+        results = []
+        for entry in self.data:
+            if entry.get("metadata", {}).get("group_id") == group_id:
+                results.append(entry)
+        # Sort chronologically to reconstruct the original continuous session
+        results.sort(key=lambda x: x.get("metadata", {}).get("chunk_index", 0))
+        return results
+
     def query(self, query_text, n_results=1, where=None):
         if not self.data: return []
         

@@ -51,8 +51,11 @@ Watch the **Activity** tab. You'll see the agent:
 
 ## Capabilities
 
-### Infinite Context (RAW RAG)
-You do not need to worry about the agent "forgetting" what happened yesterday. Every chat message is transparently converted into lightweight JSON Embeddings in `memory_vault.json` and automatically injected dynamically when relevant.
+### Infinite Context (Agentic Session Memory)
+You do not need to worry about the agent "forgetting" what happened yesterday. The agent uses an **Extremely Long Context Window Technique** optimized for consumer PCs (built on [mhndayesh/infinite-context-rag](https://github.com/mhndayesh/infinite-context-rag)):
+*   **Session Tagging**: Every conversation and massive paste is tracked as a continuous block of time in `memory_vault.json`.
+*   **Agentic Search & Routing**: The local AI acts as its own search engine. If you ask a question, it intelligently rewrites your query into dense keywords, searches the vault, and then automatically votes on the best mathematical match.
+*   **Context Exhumation**: Instead of giving the AI a fragmented sentence, it pulls the entire 6k+ character historical conversation surrounding that exact memory, granting true continuous context.
 
 ### Environment Management 🌍
 The agent can create isolated playgrounds for code:
