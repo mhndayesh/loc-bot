@@ -1083,7 +1083,9 @@ TEXT:
         # 4. Extract natural language reply first (Robust Step)
         clean_reply = self.strip_thinking(response)
         # Also strip [TOOL] blocks for the clean version
-        clean_reply = re.sub(r'\[TOOL\].*?\[/TOOL\]', '', clean_reply, flags=re.DOTALL).strip()
+        clean_reply = re.sub(r'\[TOOL\].*?\[/TOOL\]', '', clean_reply, flags=re.DOTALL)
+        # Strip hallucinated markdown JSON blocks that some models append
+        clean_reply = re.sub(r'```json\s*\{.*?\}\s*```', '', clean_reply, flags=re.DOTALL | re.IGNORECASE).strip()
 
         # 5. Parse & execute tool call
         result = self.parse_and_run(response)

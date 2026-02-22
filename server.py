@@ -1055,7 +1055,8 @@ def _build_chat_system_prompt(thinking_enabled):
         "## Rules & Tools\n"
         "1. Reason in `[THINK]...[/THINK]`.\n"
         "2. Actions MUST use `[TOOL] name(args) [/TOOL]` syntax.\n"
-        "3. Refer to MAP.md for identity.\n\n"
+        "3. NEVER output JSON blocks for tool execution.\n"
+        "4. Refer to MAP.md for identity.\n\n"
         "## Available Tools\n"
         f"{skills_text}"
     )
