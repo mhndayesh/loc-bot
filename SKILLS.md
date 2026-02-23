@@ -21,6 +21,10 @@
 - `env_manager.py`: env_manager: Manage Python virtual environments.
 - `gen_pass_tool.py`: gen_pass: Generates a password.
 - `git_commit.py`: Skill: git_commit
+- `google_read_ads.py`: name: read_google_ads_campaigns
+- `google_read_calendar.py`: name: read_calendar_events
+- `google_read_emails.py`: name: read_recent_emails
+- `google_send_email.py`: name: send_email
 - `kill_process.py`: Skill: kill_process
 - `list_dir.py`: List the contents of a specified directory.
 - `port_checker.py`: Custom tool.
