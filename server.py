@@ -1121,6 +1121,17 @@ if __name__ == "__main__":
         heartbeat_thread.start()
         log.info("Heartbeat resumed from persistent state.")
 
+    # ── Check for Google Credentials Configuration ────────────────────────
+    if not os.path.exists(os.path.join(BASE_DIR, "credentials.json")):
+        log.warning("=========================================================================")
+        log.warning(" 🔑 GOOGLE INTEGRATION INACTIVE: 'credentials.json' not found!")
+        log.warning(" To enable Gmail, Calendar, and Google Ads tools:")
+        log.warning(" 1. Go to Google Cloud Console > APIs & Services > Credentials")
+        log.warning(" 2. Create an OAuth 2.0 Client ID (Desktop App)")
+        log.warning(" 3. Download the JSON and save it as 'credentials.json' in this folder.")
+        log.warning(" The agent will automatically prompt for login on its first Google action.")
+        log.warning("=========================================================================")
+
     server = ThreadingHTTPServer(("127.0.0.1", args.port), AgentAPIHandler)
     log.info("GUI server running at http://localhost:%d", args.port)
     try:
