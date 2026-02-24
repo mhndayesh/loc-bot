@@ -1,2 +1,0 @@
-<think>
-Okay, the user is asking me to simulate an AI response under strict constraints - I must output only one character "

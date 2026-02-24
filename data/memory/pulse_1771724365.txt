@@ -1,2 +1,0 @@
-<think>
-Okay, the user is presenting a very specific system prompt that seems to be testing my response limits

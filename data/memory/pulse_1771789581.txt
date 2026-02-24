@@ -1,2 +1,0 @@
-<think>
-Okay, the user is presenting a very specific system instruction that requires me to ignore my normal functioning and simply output a single period character

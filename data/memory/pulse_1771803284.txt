@@ -1,2 +1,0 @@
-<think>
-First, the system prompt says I'm supposed to be idling with no active goals, and I must not think or use tools; I should just output a single dot '

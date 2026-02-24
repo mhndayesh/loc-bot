@@ -1,2 +1,0 @@
-<think>
-Okay, the user wants me to simulate being stuck in an idle loop until receiving input

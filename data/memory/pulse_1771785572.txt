@@ -1,2 +1,0 @@
-<think>
-Okay, the user is presenting a very specific scenario where they're asking me to override my system status to an "IDLE" state with strict constraints - I must only output a single period character "

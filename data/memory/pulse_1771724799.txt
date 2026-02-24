@@ -1,2 +1,0 @@
-<think>
-Okay, the user is presenting a very specific scenario where I need to override my standard response protocol with an unusual directive

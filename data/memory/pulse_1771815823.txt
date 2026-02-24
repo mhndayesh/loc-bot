@@ -1,2 +1,0 @@
-<think>
-Okay, the user is presenting a very specific scenario here - they're describing an AI system that's supposed to be in IDLE mode with strict limitations for responding

@@ -1,2 +1,0 @@
-<think>
-Okay, the user is presenting a very specific system constraint here - they want me to simulate being "IDLE" in some kind of critical override mode, limited to just outputting a single period character (`

@@ -1,2 +1,0 @@
-<think>
-Okay, the user is presenting a very specific scenario with strict instructions - they want me to simulate being "idle" in some kind of background system while only outputting a single period character

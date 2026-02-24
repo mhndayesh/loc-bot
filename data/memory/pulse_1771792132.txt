@@ -1,2 +1,0 @@
-<think>
-Okay, the user has triggered an override mode with strict instructions - they want me to respond only with a single period character (`

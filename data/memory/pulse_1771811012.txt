@@ -1,2 +1,0 @@
-<think>
-Okay, so the user is presenting a very specific system constraint here - they want me to simulate an IDLE state where I must respond with just a single period character (`

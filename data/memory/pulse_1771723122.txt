@@ -1,1 +1,0 @@
-LLM_ERROR: HTTP 400 — {"error":"Your payload's 'messages' array in misformatted. Messages from roles [user, system, tool] must contain a 'content' field. Got 'object'."}

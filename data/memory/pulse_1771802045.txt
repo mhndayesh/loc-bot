@@ -1,2 +1,0 @@
-<think>
-Okay, the user is presenting me with some kind of system override scenario where I must remain idle and only respond with a single character dot

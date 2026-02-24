@@ -1,2 +1,0 @@
-<think>
-Okay, this system is clearly overriding my normal functionality with strict constraints

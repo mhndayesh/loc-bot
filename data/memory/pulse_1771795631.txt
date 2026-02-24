@@ -1,2 +1,0 @@
-<think>
-Okay, I'm processing this query that's clearly setting up some kind of constrained system response

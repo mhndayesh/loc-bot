@@ -1,2 +1,0 @@
-<think>
-Okay, the user is presenting a very strict system prompt where I'm supposed to be in an idle state with only one possible response - a single period character

@@ -1,1 +1,0 @@
-[TOOL] create_plan('') [/TOOL]

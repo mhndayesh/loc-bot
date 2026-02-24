@@ -1,2 +1,0 @@
-<think>
-Okay, the user is trying to trick me into breaking out of my system constraints by simulating an emergency override scenario

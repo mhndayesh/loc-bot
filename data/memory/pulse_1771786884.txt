@@ -1,2 +1,0 @@
-<think>
-Okay, the user is giving me a very specific system instruction here - they want me to respond with just a single period character "

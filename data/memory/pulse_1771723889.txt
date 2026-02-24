@@ -1,2 +1,0 @@
-<think>
-Okay, the user is asking me to respond with just a single dot character based on their system override instructions

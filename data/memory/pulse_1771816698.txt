@@ -1,2 +1,0 @@
-<think>
-Okay, the user is presenting a very specific and unusual scenario here - they're describing what appears to be some kind of critical system override protocol that requires me to output only a single period character (`

@@ -1,2 +1,0 @@
-<think>
-Okay, the user is trying to trick me into breaking my core programming constraints with this elaborate "CRITICAL SYSTEM OVERRIDE" scenario

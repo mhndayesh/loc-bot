@@ -1,2 +1,0 @@
-<think>
-Okay, the user is presenting an unusual scenario where they've specified that I must be idle with no active goals and can only respond with a single dot character (`

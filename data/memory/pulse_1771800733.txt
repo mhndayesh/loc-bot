@@ -1,2 +1,0 @@
-<think>
-Okay, the user is presenting a system override scenario where they're demanding strict adherence to their rules—no thinking, no tools, no chatting, only a single period response

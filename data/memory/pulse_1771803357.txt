@@ -1,2 +1,0 @@
-<think>
-First, the system says I'm idle with no active goals, and it specifies that I must not think or use tools; I should just chat according to the instructions

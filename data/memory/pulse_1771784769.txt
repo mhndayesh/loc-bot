@@ -1,2 +1,0 @@
-<think>
-Okay, the user is presenting a very strict scenario where I'm supposed to be idling with a continuous heartbeat-like dot output

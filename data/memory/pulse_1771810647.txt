@@ -1,2 +1,0 @@
-<think>
-Okay, the user is presenting a very specific system prompt that forces me into a constrained mode - only responding with a single period character when in IDLE status

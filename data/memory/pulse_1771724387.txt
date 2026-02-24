@@ -1,2 +1,0 @@
-<think>
-Okay, the user is asking me to simulate being an AI named "DeepSeek," but with strict limitations - only responding with a single period when idle in a background heartbeat

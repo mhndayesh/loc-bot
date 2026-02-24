@@ -1,2 +1,0 @@
-<think>
-First, the user's message says "STATUS: IDLE

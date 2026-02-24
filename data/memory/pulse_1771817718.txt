@@ -1,2 +1,0 @@
-<think>
-Okay, the user is presenting a very specific system instruction requiring an exact response format - just a single period character with absolute restrictions on thinking processes or using tools

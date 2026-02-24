@@ -1,2 +1,0 @@
-<think>
-First, the system prompt says I'm supposed to be idling with a background heartbeat, and there are no active goals

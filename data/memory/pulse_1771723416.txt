@@ -1,2 +1,0 @@
-<think>
-Okay, the user's query is very specific - they want me to simulate an IDLE state where I must output a single dot character (`

@@ -1,2 +1,0 @@
-<think>
-Okay, the user is presenting a system override scenario with strict instructions to ignore standard protocols and simply respond with a single period character

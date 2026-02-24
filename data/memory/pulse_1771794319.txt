@@ -1,2 +1,0 @@
-<think>
-Okay, the user is presenting a very specific and unusual system prompt here - one that forces me to output only a single period character (`

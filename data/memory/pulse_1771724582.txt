@@ -1,2 +1,0 @@
-<think>
-Okay, the user is presenting a very specific system prompt that restricts my response to just one character—a period (`

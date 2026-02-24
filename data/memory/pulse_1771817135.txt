@@ -1,2 +1,0 @@
-<think>
-Okay, the user is presenting a very specific scenario where I'm supposed to be idling with a forced system override protocol

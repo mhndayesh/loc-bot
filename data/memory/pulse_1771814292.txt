@@ -1,2 +1,0 @@
-<think>
-Hmm, the user is presenting an unusual scenario with strict formatting constraints - they want me to simulate being "IDLE" in a system heartbeat while only outputting a single period

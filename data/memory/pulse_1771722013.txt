@@ -1,2 +1,0 @@
-<think>
-We are given an environment with Windows OS, workspace at C:\new-agent-mohannad, and the map is in MAP

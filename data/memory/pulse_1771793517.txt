@@ -1,2 +1,0 @@
-<think>
-Okay, the user is presenting a very specific system override scenario where I must remain idle with no active goals, think critically but not use tools or chat, and strictly output only one character: '

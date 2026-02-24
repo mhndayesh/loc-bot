@@ -1,2 +1,0 @@
-<think>
-Hmm, the user is presenting an unusual scenario where they're instructing me to override my core functioning by ignoring all standard protocols

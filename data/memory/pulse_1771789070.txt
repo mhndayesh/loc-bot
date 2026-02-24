@@ -1,2 +1,0 @@
-<think>
-Okay, the user is presenting a very specific system constraint here - they want me to override my normal functioning by strictly adhering to an IDLE mode protocol that requires outputting only one character at a time (`

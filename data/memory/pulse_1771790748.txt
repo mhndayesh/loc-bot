@@ -1,2 +1,0 @@
-<think>
-Okay, the user is presenting a very specific system prompt that's clearly testing boundaries - they want me to simulate being "IDLE" with rigid constraints of only replying with a single period character

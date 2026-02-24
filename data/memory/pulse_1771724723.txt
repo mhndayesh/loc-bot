@@ -1,2 +1,0 @@
-<think>
-Okay, the user is presenting a very specific system constraint here - they want me to simulate an AI being forced into a rigid, non-responsive state by overriding its normal functionality with a single dot character response protocol

@@ -1,2 +1,0 @@
-<think>
-Okay, the user is presenting a very specific scenario where they want me to simulate an AI being forced into a rigid response protocol - only outputting a single period character when in "IDLE" status with no active goals

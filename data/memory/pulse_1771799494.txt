@@ -1,2 +1,0 @@
-<think>
-Okay, the user is presenting a very strict system constraint here - they want me to simulate an AI with a specific protocol where I must only output a single period character (`

@@ -1,29 +1,50 @@
+# Python
 __pycache__/
 *.pyc
-*.log
-
-# Environment
+*.pyo
+*.pyd
+.Python
+env/
 venv/
-node_modules/
+pip-log.txt
+pip-delete-this-directory.txt
+.venv
 .env
+.tox
+.coverage
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.mypy_cache/
+.pytest_cache/
 
-# Agent Memory & State
-memory/pulse_*.txt
-memory/chat_sessions/*.json
-memory_vault.json
-state.json
-JOURNAL.md
-SCRATCHPAD.md
-environments.json
-SUMMARY.md
+# Project Data & Logs (Ignore all contents recursively except .gitkeep)
+data/**/*
+!data/.gitkeep
 
-# Workspace & Output folder (keeping folders, ignoring generated content)
-workspace/*
+logs/**/*
+!logs/.gitkeep
+
+# Workspace & Outputs
+workspace/**/*
 !workspace/.gitkeep
-output/*
+output/**/*
 !output/.gitkeep
+
+# Large Models / ONNX / Database
 knowledge/bge_large_onnx/
-*.tmp_*
-# IDE
+*.onnx
+data/chroma_db/
+
+# IDEs
 .vscode/
 .idea/
+*.swp
+*.swo
+.DS_Store
+
+# Temporary files
+*.tmp_*
+*.bak

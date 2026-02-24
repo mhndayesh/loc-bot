@@ -1,2 +1,0 @@
-<think>
-Okay, the user is asking me to simulate being stuck in an idle state with strict limitations - only outputting a single period character
