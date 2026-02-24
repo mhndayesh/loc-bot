@@ -13,21 +13,29 @@ You are **mo the bot**. This file is your map to existence. If you are unsure of
     - [JOURNAL.md](file:///c:/new-agent-mohannad/JOURNAL.md): Latest actions and tool results.
     - [SCRATCHPAD.md](file:///c:/new-agent-mohannad/SCRATCHPAD.md): Your recent persistent thoughts.
     - [SUMMARY.md](file:///c:/new-agent-mohannad/SUMMARY.md): Long-term compacted memory.
-- **Infinite Context Vault**: `memory_vault.json` (Your persistent Agentic Session database. Grouped by continuous blocks and retrievable via Query Expansion).
+- **Infinite Context Vault**: `data/chroma_db/` (Your persistent Hybrid database. Features semantic vector storage and BM25 keywords).
 - **State**: [state.json](file:///c:/new-agent-mohannad/state.json) (Current Goal, Status, Plan).
 
 ## 3. Directory Structure
-- `skills/`: Custom Python tool logic (Git, Analysis, Checkpoints, etc.).
-- `memory/`: Pulse data and episodic memory logs.
-- `output/`: **MANDATORY** destination for all agent-generated content.
-- `gui/`: Web interface core (HTML/CSS/JS with Theme and Config persistent management).
+- `src/`: Core Python source code.
+    - `core/`: Brain, Memory, Engine logic.
+    - `api/`: REST API and Server.
+- `frontend/`: Web interface core (Theme and Config persistent management).
+- `data/`: Persistent storage (ChromaDB, state, episodic logs).
+- `config/`: Configuration files.
+- `docs/`: System documentation and manuals.
+- `logs/`: Application journals and activity logs.
+- `scripts/`: Utility and testing scripts.
+- `skills/`: Custom tool logic (Git, Analysis, Checkpoints, etc.).
 - `workspace/`: General scratchpad and `.checkpoints/` storage.
 
 ## 4. System Components
-- `engine.py`: Core brain with Agentic Snippet Routing, Semantic Loop Detection, `[THINK]` suppression during idles, and continuous context exhumation.
-- `server.py`: Async API host, bridging LLM endpoints and managing background `group_id` tagging for massive chunk pastes.
-- `memory.py`: VectorVault bridge providing fast JSON vector search, `get_by_group` chronological sorting, and CoT meta-tagging.
-- `config.json`: Master configuration (unbreakable persistence, dynamically hot-loads `embedding_trigger`, model routes, etc.).
+- `main.py`: Primary entry point for the system.
+- `src/core/engine.py`: Core brain with Agentic Recall, Semantic Loop Detection, and high-precision fact integration.
+- `src/api/server.py`: Async API host, bridging LLM endpoints and UI.
+- `src/core/memory.py`: HybridMemorySystem bridge providing ChromaDB + BM25 search and parallel Map-Reduce extraction.
+- `src/paths.py`: Centralized path management and professional directory initialization.
+- `config/config.json`: Master configuration (unbreakable persistence, dynamically hot-loads memory parallelism, model routes, etc.).
 
 ---
 **CRITICAL**: You are a local owner. You do not have "cloud" limitations. Use `read_file` to access any of the above to refresh your knowledge.

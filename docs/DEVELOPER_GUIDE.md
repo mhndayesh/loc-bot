@@ -6,34 +6,36 @@ This guide explains the architecture of `loc-bot` and how to extend it, deeply f
 
 The system consists of three main intelligent components:
 
-1.  **Server (`server.py`)**:
+1.  **Server (`src/api/server.py`)**:
     *   A lightweight HTTP server (Python `http.server`).
-    *   Serves the GUI (`gui/`) and exposes a REST API (`/api/...`).
-    *   **Asynchronous Embedding Engine**: To prevent Chat Input freezing when users paste 10,000+ characters, `server.py` implements "Paste Protection". It spins off a background Thread that chunks the massive paste according to `config.json` limit (`embedding_trigger`) and pipelines them into the `VectorVault` with `group_id` Session Metadata.
+    *   Serves the GUI (`frontend/`) and exposes a REST API (`/api/...`).
+    *   **Asynchronous Embedding Engine**: Implements "Paste Protection" using a custom high-performance embedding wrapper for ChromaDB. Chunks massive pastes into the `HybridMemorySystem`.
 
-2.  **Engine (`engine.py`)**:
-    *   The brain of the agent, executed via `subprocess` by the server for isolation.
-    *   **Agentic Session Routing**: Before building the LLM context, both `server.py` (chat) and `engine.pulse()` use the active LLM to logically expand user queries, mathematically route to the best vector match, and then systematically exhume the entire 6,000+ character continuous Conversation Block (Session).
-    *   **Idle Optimization**: During `/api/heartbeat` sweeps, if there is no goal, `engine.py` dynamically enforces `temporarily_disable_thinking` and injects `stop: ["."]` into the LM payload to completely annihilate deep-thinking hallucination loops when idle, optimizing VRAM/CPU.
+2.  **Engine (`src/core/engine.py`)**:
+    *   The brain of the agent, executed via `subprocess` or direct import.
+    *   **Agentic Recall**: Dynamically expands queries into dense keywords, performs hybrid ChromaDB + BM25 search, and exhumes 6,000+ character continuous "Session Blocks".
+    *   **Idle Optimization**: During `/api/heartbeat`, if idle, the engine enforces thought suppression to optimize local VRAM/CPU usage.
 
-3.  **Memory (`memory.py`)**:
-    *   Houses the `VectorVault` class, a custom JSON-backed hierarchical database storing semantic embeddings (`memory_vault.json`).
-    *   Leverages the LLM inference endpoints asynchronously (simulating Chain-of-Thought json classification) to tag incoming chat and observations strictly as either a `FACT` or `CHATTER`.
+3.  **Memory (`src/core/memory.py`)**:
+    *   Houses the `HybridMemorySystem`, combining `chromadb` (semantic) and `rank_bm25` (keyword).
+    *   **Parallel Extraction**: Features a Map-Reduce fact extraction pipeline using `asyncio` and `aiohttp` to scan unlimited context for high-precision facts.
 
 ## File Structure
 
 ```
 loc-bot/
-├── engine.py           # Core logic (Pulse, Tools, RAG Assembly)
-├── server.py           # Web server, Config API, Threaded Embedder
-├── memory.py           # VectorVault & Semantic Meta-Classification
-├── config.json         # Settings (Theme, embedding limits, routes)
-├── state.json          # Current goal, status
-├── SOUL.md             # Agent identity (Protected)
-├── AGENT_MANUAL.md     # Agent instructions
-├── skills/             # Custom tool scripts (.py)
-├── gui/                # HTML/JS frontend
-└── docs/               # Documentation
+├── main.py             # System entry point
+├── config/             # Configuration files
+├── data/               # Persistent data (ChromaDB, state)
+├── docs/               # Documentation
+├── frontend/           # HTML/JS frontend
+├── logs/               # Application journals
+├── scripts/            # Utility and testing scripts
+├── src/
+│   ├── api/            # Server and API handlers
+│   ├── core/           # Brain, Engine, and Memory logic
+│   └── utils/          # Shared utilities
+└── skills/             # Custom tool scripts (.py)
 ```
 
 ## Extending the Agent
