@@ -1,0 +1,2 @@
+<think>
+Okay, the user is presenting a very strict system prompt requiring me to output only a single dot character (`

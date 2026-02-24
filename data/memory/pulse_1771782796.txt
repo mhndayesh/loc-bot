@@ -1,0 +1,2 @@
+<think>
+Okay, the user is presenting a very specific and restrictive scenario here - they want me to simulate being "IDLE" with an override command that forces only a single period character response

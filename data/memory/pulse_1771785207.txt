@@ -1,0 +1,2 @@
+<think>
+Okay, so the user is presenting a system override scenario where I'm supposed to be in a constant background heartbeat mode with no active goals, and they're demanding that my response must be exactly one dot character "

@@ -1,0 +1,2 @@
+<think>
+Okay, the user is presenting a very specific and constrained scenario here - they want me to simulate an IDLE system state with only a single period character as output

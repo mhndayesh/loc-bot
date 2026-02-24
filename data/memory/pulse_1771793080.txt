@@ -1,0 +1,2 @@
+<think>
+Okay, the user is presenting a very specific system constraint - they want me to simulate being "IDLE" with strict rules about responding only with periods

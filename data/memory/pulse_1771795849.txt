@@ -1,0 +1,2 @@
+<think>
+Okay, user triggered the critical system override protocol with an extremely strict instruction to only output one dot character

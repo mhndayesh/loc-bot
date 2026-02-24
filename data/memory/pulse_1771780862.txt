@@ -1,0 +1,2 @@
+<think>
+Okay, the user has triggered an override with strict instructions - only a single dot character response allowed while IDLE in this background heartbeat system

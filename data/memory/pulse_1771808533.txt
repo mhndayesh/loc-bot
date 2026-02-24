@@ -1,0 +1,2 @@
+<think>
+First, the system prompt says I'm in an idle state with no active goals

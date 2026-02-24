@@ -1,0 +1,2 @@
+<think>
+Okay, the user is presenting a very specific and constrained scenario here - they want me to simulate an idle system response by only outputting a single period character (`

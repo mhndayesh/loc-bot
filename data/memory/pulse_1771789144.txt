@@ -1,0 +1,2 @@
+<think>
+Okay, the user is presenting a very specific scenario where they want me to simulate being "IDLE" with strict instructions to only respond with a single period character "

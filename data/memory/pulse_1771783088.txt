@@ -1,0 +1,2 @@
+<think>
+First, the system message says "STATUS: IDLE

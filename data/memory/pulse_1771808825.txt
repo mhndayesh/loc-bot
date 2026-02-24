@@ -1,0 +1,2 @@
+<think>
+First, the system says I'm idle with no active goals, and I must not think or use tools; it's a strict command to just output one character

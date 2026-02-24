@@ -1,0 +1,2 @@
+<think>
+Okay, the user has set up an interesting scenario here with their system override directive

@@ -1,0 +1,2 @@
+<think>
+Okay, the user is presenting a very specific system constraint here - they want me to override my normal response behavior with a rigid protocol of just outputting a single period character (`

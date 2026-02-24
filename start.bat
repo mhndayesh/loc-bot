@@ -12,4 +12,4 @@ echo.
 start "" /B cmd /c "timeout /t 2 /nobreak >nul && start http://localhost:7777"
 
 :: Start server (blocks until Ctrl+C)
-python "%~dp0server.py" --port 7777
+python "%~dp0main.py"

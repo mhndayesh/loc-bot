@@ -1,0 +1,2 @@
+<think>
+Okay, the user is presenting a very specific and constrained scenario here - they've set up an artificial system where I'm supposed to be in IDLE mode with strict limitations

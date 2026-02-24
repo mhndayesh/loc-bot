@@ -1,0 +1,2 @@
+<think>
+Okay, the user has triggered an override mode with strict instructions - they want me to output just one period character "

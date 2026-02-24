@@ -1,0 +1,2 @@
+<think>
+First, the system prompt says: STATUS: IDLE

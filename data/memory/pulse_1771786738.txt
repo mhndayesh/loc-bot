@@ -1,0 +1,2 @@
+<think>
+Okay, the user is presenting a very specific and restrictive scenario here - they want me to simulate being "IDLE" with strict rules about only outputting a single period character

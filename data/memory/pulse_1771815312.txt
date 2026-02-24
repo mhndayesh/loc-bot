@@ -1,0 +1,2 @@
+<think>
+Okay, the user is presenting some kind of system override scenario where I'm supposed to be idle but must output a single dot character without thinking or using tools

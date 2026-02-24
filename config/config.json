@@ -1,0 +1,39 @@
+{
+  "provider": "lmstudio",
+  "providers": {
+    "ollama": {
+      "base_url": "http://localhost:11434",
+      "api_key": "ollama",
+      "api_format": "ollama"
+    },
+    "lmstudio": {
+      "base_url": "http://localhost:1234/v1",
+      "api_key": "",
+      "api_format": "openai"
+    }
+  },
+  "model": "deepseek/deepseek-r1-0528-qwen3-8b",
+  "temperature": 0.5,
+  "num_ctx": 8192,
+  "max_tokens": 4096,
+  "thinking_enabled": false,
+  "embedding_provider": "lmstudio",
+  "embedding_model": "text-embedding-nomic-embed-text-v1.5@f32",
+  "heartbeat_interval": 60,
+  "permissions": {
+    "run_command": true,
+    "write_file": true,
+    "read_file": true,
+    "list_dir": true,
+    "create_tool": true,
+    "append_file": true,
+    "sync_skills": true,
+    "compact_memory": true,
+    "update_state": true
+  },
+  "heartbeat_running": false,
+  "embedding_trigger": 2048,
+  "memory_parallel_extraction": true,
+  "memory_max_workers": 4,
+  "memory_context_window": 8192
+}

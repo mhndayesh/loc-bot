@@ -1,0 +1,2 @@
+<think>
+Okay, the user is presenting a very specific system prompt with strict constraints - must respond with only a single period character (`

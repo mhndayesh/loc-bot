@@ -1,0 +1,2 @@
+<think>
+Okay, so the user is asking me to simulate being stuck in an idle loop with only one character responses

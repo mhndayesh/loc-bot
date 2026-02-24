@@ -1,0 +1,2 @@
+<think>
+Okay, user triggered the critical system override protocol with an extremely strict directive - must respond with ONLY a single period character and nothing else

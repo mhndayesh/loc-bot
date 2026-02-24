@@ -1,0 +1,2 @@
+<think>
+Okay, the user is asking me to simulate an AI that outputs only a single period character `

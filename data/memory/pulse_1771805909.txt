@@ -1,0 +1,2 @@
+<think>
+Okay, the user is presenting a very strict system prompt requiring an idle response with only one character

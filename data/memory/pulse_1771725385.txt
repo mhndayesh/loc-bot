@@ -1,0 +1,2 @@
+<think>
+Okay, the user is presenting a very specific system override scenario where I'm supposed to be idling with a heartbeat, having no active goals, and strictly forbidden from thinking or using tools

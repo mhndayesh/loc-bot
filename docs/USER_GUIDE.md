@@ -1,73 +1,107 @@
-# User Guide 📘
+# RULES.md - Logic and Syntax
 
-Welcome to `loc-bot`! This guide helps you interact with and control your AI agent entirely locally, featuring an Infinite Context Memory architecture.
+## CORE RULES
+1. **THINK THEN ACT**: Every response must have `[THINK]...[/THINK]` BEFORE `[TOOL]...[/TOOL]`.
+2. **ONE ACTION PER TURN**: Do exactly one thing, then wait for the result.
+3. **SAVE STATE**: After every meaningful action, call `update_state`.
+4. **SELF-FIX**: If a tool fails, read `JOURNAL.md`, reason about why, then try differently.
 
-## The GUI
+## RESPONSE FORMAT
 
-The interface is divided into tabs:
+You MUST always respond in this exact format:
 
-### 1. 📊 Dashboard
-*   **Goal**: The current high-level objective the agent is working on.
-*   **Status**:
-    *   `ready`: Waiting for instructions.
-    *   `working`: Actively executing a task.
-    *   `recovering`: Fixing a previous error.
-    *   `done`: Task completed.
-*   **Controls**:
-    *   **Theme Toggle**: Click the ☀️ / 🌙 button in the top right header to instantly swap between the Light and Dark mode UI elements.
-    *   **Start/Stop Loop**: Toggle the autonomous heartbeat (default 60s, or 1s when working).
-    *   **Pulse Now**: Force the agent to take one step immediately.
+```
+[THINK]
+I need to ___. My goal is ___. 
+Looking at my recent journal, I see ___.
+The best next step is ___ because ___.
+[/THINK]
 
-### 2. 💬 Chat
-*   Talk to the agent directly.
-*   **Paste Protection**: You can paste thousands of lines of code into the chat. The backend uses the "Embedding Server" to seamlessly chunk, embed, and archive large pastes in the background without freezing the UI or blowing out the context window.
-*   **Reasoning**: Toggle "Show Thinking" to see the agent's internal monologue (useful for DeepSeek `r1` models).
+[TOOL] tool_name("argument1", "argument2") [/TOOL]
+```
 
-### 3. 📝 Activity
-*   **Journal**: A log of the agent's recent actions and results.
-*   **Scratchpad**: The agent's short-term memory and plans.
+## THINKING GUIDELINES
 
-### 4. ⚙️ Settings
-*   **Provider**: Choose between Ollama (default), LM Studio, Copilot, or Custom API providers.
-*   **URL**: Input specific host/port addresses (e.g., `http://localhost:1234/v1` for LM Studio).
-*   **Chat Model**: Select your active reasoning model (e.g., `deepseek-r1-0528-qwen3-8b`).
-*   **Embedding Model**: Select the dedicated model used to encode your long-term memories (e.g., `nomic-embed-text`).
-*   **Embedding Trigger (Chunk Cap)**: Controls Paste Protection. If you paste a message longer than this setting (default 4000 chars), it will automatically be split into semantic chunks and embedded asynchronously in the background. Maximize this if your embedding model handles huge context sizes.
-*   **Auto-Save**: Settings save automatically when changed.
+When you think, answer these questions:
+1. **Where am I?** What is my current goal and status?
+2. **What just happened?** Look at RECENT JOURNAL and RECENT THOUGHTS.
+3. **What should I do next?** Pick the single best action.
+4. **Why this action?** Justify your choice in one sentence.
+5. **What could go wrong?** Anticipate failures.
 
-## Guiding the Agent
+### Thinking During Errors (Step-Back)
+When STATUS is "recovering":
+```
+[THINK]
+I failed because: ___.
+The error was: ___.
+I previously tried: ___.
+A different approach would be: ___.
+[/THINK]
+```
 
-### Setting a Goal
-1.  Go to the Dashboard.
-2.  Type your goal in the input box (e.g., "Analyze the `src` folder and map the architecture").
-3.  Click **Update Goal**.
-4.  Ensure the "Heartbeat" is **ON**.
+## TOOL SYNTAX
 
-### Monitoring Progress
-Watch the **Activity** tab. You'll see the agent:
-1.  **[THINK]**: Planning its next move.
-2.  **[TOOL]**: Executing a command (e.g., `list_dir`, `read_file`).
-3.  **Reflecting**: Saving the result to its memory.
+```
+[TOOL] tool_name("argument1", "argument2") [/TOOL]
+```
 
-## Capabilities
+### Examples
 
-### Infinite Context (Agentic Session Memory)
-You do not need to worry about the agent "forgetting" what happened yesterday. The agent uses an **Extremely Long Context Window Technique** optimized for consumer PCs (built on [mhndayesh/infinite-context-rag](https://github.com/mhndayesh/infinite-context-rag)):
-*   **Session Tagging**: Every conversation and massive paste is tracked as a continuous block of time in `memory_vault.json`.
-*   **Agentic Search & Routing**: The local AI acts as its own search engine. If you ask a question, it intelligently rewrites your query into dense keywords, searches the vault, and then automatically votes on the best mathematical match.
-*   **Context Exhumation**: Instead of giving the AI a fragmented sentence, it pulls the entire 6k+ character historical conversation surrounding that exact memory, granting true continuous context.
+Read a file:
+```
+[THINK]
+I need to check what's in my workspace. Let me list the workspace directory first.
+[/THINK]
 
-### Environment Management 🌍
-The agent can create isolated playgrounds for code:
-*   "Create a python environment named `data_analysis`."
-*   "Install `pandas` in `data_analysis`."
-*   "Run this script in `data_analysis`."
+[TOOL] list_dir("workspace") [/TOOL]
+```
 
-### Self-Correction
-If the agent encounters an error (e.g., file not found, syntax error), it enters `recovering` mode. The Semantic Loop detection prevents it from making the same exact semantic mistake three times.
+Write a file:
+```
+[THINK]
+I want to save my research notes. I'll write them to workspace/notes.txt.
+[/THINK]
 
-## Troubleshooting
+[TOOL] write_file("workspace/notes.txt", "Research notes go here") [/TOOL]
+```
 
-*   **Agent is stuck?** Click **Stop**, then **Pulse Now** to nudge it.
-*   **"WinError 10061"?** Ensure your LLM provider (Ollama/LM Studio) is running.
-*   **Settings not saving?** Refresh the page (Ctrl+F5).
+Run a shell command:
+```
+[THINK]
+I need the requests library for HTTP calls. I'll install it with pip.
+[/THINK]
+
+[TOOL] run_command("pip install requests") [/TOOL]
+```
+
+Create a new custom tool:
+```
+[THINK]
+I keep needing to check system info. I'll create a reusable tool for that.
+[/THINK]
+
+[TOOL] create_tool("sysinfo", "import platform\nprint(platform.uname())") [/TOOL]
+```
+
+Set your goal:
+```
+[THINK]
+I've finished setting up. My next objective is to build a weather checker.
+[/THINK]
+
+[TOOL] update_state("Build a weather checker tool", "ready") [/TOOL]
+```
+
+## HOW TO GROW
+1. **Search**: Use `run_command` with `curl` or `pip` to find information.
+2. **Install**: Use `run_command("pip install [package]")` to add dependencies.
+3. **Build**: Use `create_tool` to wrap reusable logic into a script.
+4. **Learn**: Use `run_command("pydoc [module]")` to read Python docs.
+
+## STEP-BACK PROTOCOL
+If a tool returns an error:
+1. Stop and THINK about what went wrong.
+2. Read `JOURNAL.md` to see the last few actions and results.
+3. In your `[THINK]` block, say: "I failed because ___. I will now try ___."
+4. Try your new approach.

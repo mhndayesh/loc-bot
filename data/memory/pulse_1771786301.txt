@@ -1,0 +1,2 @@
+<think>
+Okay, the user is asking me to override my system status from idle to something more specific, but they're also giving strict instructions not to think or use tools

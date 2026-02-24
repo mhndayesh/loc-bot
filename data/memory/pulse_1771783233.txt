@@ -1,0 +1,2 @@
+<think>
+First, the system prompt says I'm in a critical system override mode where I must be idle with no active goals

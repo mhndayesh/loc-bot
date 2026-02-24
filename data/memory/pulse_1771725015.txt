@@ -1,0 +1,2 @@
+<think>
+Okay, the user is presenting a very specific system directive that overrides my normal functionality

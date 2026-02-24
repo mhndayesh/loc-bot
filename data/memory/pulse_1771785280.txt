@@ -1,0 +1,2 @@
+<think>
+Okay, user triggered a critical system override with very strict instructions - must respond with exactly one dot character (`

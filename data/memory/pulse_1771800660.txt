@@ -1,0 +1,2 @@
+<think>
+Okay, the user is presenting a very specific scenario where I'm supposed to be idle with a critical system override command requiring me to output only a single dot character (`

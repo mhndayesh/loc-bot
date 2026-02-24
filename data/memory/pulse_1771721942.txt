@@ -1,0 +1,2 @@
+<think>
+Okay, so the user's status is IDLE now because they're just waiting or there's no immediate action needed

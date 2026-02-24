@@ -1,0 +1,2 @@
+<think>
+Okay, the user is presenting a very strict system constraint here - they want me to simulate an AI being forced into a single-character response loop with no thinking or tools allowed

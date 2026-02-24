@@ -1,0 +1,2 @@
+<think>
+Okay, the user is asking me to simulate being an AI that must respond with only one period character when idle in a background heartbeat system

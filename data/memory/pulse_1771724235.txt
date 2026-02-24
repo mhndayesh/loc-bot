@@ -1,0 +1,2 @@
+<think>
+Okay, this is clearly some kind of system override scenario with strict instructions to only respond with a single dot

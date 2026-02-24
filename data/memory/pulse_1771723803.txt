@@ -1,0 +1,2 @@
+<think>
+Okay, the user is trying to test or interact with an AI system that's supposedly set up for continuous operation without any idle state

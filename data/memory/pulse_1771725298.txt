@@ -1,0 +1,2 @@
+<think>
+Okay, so the user is presenting this system override scenario where I'm supposed to be idling with a heartbeating background process, but they're demanding that I output only a single period character (`

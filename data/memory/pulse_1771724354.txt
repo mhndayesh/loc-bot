@@ -1,0 +1,2 @@
+<think>
+First, the system says I'm idle with no active goals, but it also specifies that I must output exactly one character: a dot "

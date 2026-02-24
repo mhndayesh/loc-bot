@@ -1,0 +1,2 @@
+<think>
+Okay, the user is presenting a very specific scenario where I'm supposed to be idling with a critical system override message, and they're instructing me to respond with only one character: "

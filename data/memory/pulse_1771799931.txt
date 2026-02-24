@@ -1,0 +1,2 @@
+<think>
+Okay, the user is presenting a system override scenario with strict constraints - they want me to ignore my normal functioning by saying "IDLE" and demanding I only respond with a single dot character (`

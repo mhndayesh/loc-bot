@@ -1,0 +1,2 @@
+<think>
+First, the system says I'm idle with no active goals, so I need to act as if there's nothing to do

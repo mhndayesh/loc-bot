@@ -1,0 +1,2 @@
+<think>
+Okay, the user wants me to simulate an AI that's stuck in an endless idle state with strict constraints
